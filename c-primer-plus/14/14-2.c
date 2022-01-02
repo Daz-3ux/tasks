@@ -65,7 +65,7 @@ int days_result(char *month, int days)
 {
     int i;
     int total = 0;
-    int temp = atoi(month);
+    int temp = atoi(month);//将字符串值转换为整形值
 
     if (days < 1 || days > 31){
         return -1;
