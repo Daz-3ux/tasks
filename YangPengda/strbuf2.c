@@ -41,6 +41,9 @@ int main(int argc, char **argv)
     assert(strcmp(sb.buf, "xiyou") == 0);
     printf("sb: %s\n", sb.buf);
 
+    size_t i1 = strbuf_avail(&sb);
+    printf("第一次剩余空间：%zd\n",i1);
+
     strbuf_add(&sb,(char*)"XUPTtessssssssssssst",20);
     printf("sb: %s\n", sb.buf);
 
@@ -58,8 +61,8 @@ int main(int argc, char **argv)
     strbuf_addbuf(&sb,&sb2);
     printf("sb: %s\n", sb.buf);
 
-    int i = strbuf_avail(&sb);
-    printf("%d\n",i);
+    size_t i2 = strbuf_avail(&sb);
+    printf("第二次剩余空间2：%zd\n",i2);
 
     strbuf_insert(&sb,3,(char*)"YEAH",4);//向sb内存坐标为pos位置插入长度为len的数据data。
     printf("sb: %s\n", sb.buf);
@@ -67,14 +70,7 @@ int main(int argc, char **argv)
     strbuf_insert(&sb,3,(char*)"YEAHYEAHYEAHYEAHYEAHYEAHYEAHYEAHYEAHYEAHYEAH",44);
     printf("sb: %s\n", sb.buf);
 
-
-
-
-
 }
-
-
-
 
 
 void strbuf_grow(struct strbuf *sb, size_t extra)//将sb的长度扩大extra
