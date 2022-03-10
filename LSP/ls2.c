@@ -64,12 +64,12 @@ void show_file_info(char *filename, struct stat *info_p)//此处的info_p就是s
 
     mode_to_letters(info_p -> st_mode, modestr);
 
-    printf("%s", modestr);//权限字符串
-    printf("%4d",(int)info_p -> st_nlink);//链接数
+    printf("%s ", modestr);//权限字符串
+    printf("%d ",(int)info_p -> st_nlink);//链接数
     printf("%-8s",uid_to_name(info_p -> st_uid));//所属用户
     printf("%-8s",gid_to_name(info_p -> st_gid));//所属用户组
-    printf("%8ld",(long)info_p -> st_size);//内存大小
-    printf("%.12s",4+ctime(&info_p -> st_mtime));//最后修改时间
+    printf("%8ld ",(long)info_p -> st_size);//内存大小
+    printf("%.12s ",4+ctime(&info_p -> st_mtime));//最后修改时间
     printf("%s\n",filename);//文件名
 
 }
@@ -104,13 +104,32 @@ void mode_to_letters(int mode,char str[])
 }
 
 //#include<pwd.h>
-char * uid_to_name(uid_t uid)
+char * uid_to_name(uid_t uid)//此处的uid值即为stat函数所读到的st_uid值
 {
+    struct passwd *getpwuid();
+    struct passwd *pw_ptr;
+    static char numstr[10];
 
+    if((pw_ptr = getpwuid(uid)) == NULL){
+        sprintf(numstr, "%d", uid);
+        return numstr;
+    }else{
+        return pw_ptr -> pw_name;
+    }
 }
 
 //#include<grp.h>
-char * gid_to_name(gid_t gid)
+char * gid_to_name(gid_t gid)//此处的gid值即为stat函数所读到的st_gid值
 {
+    struct group *getgrgid();
+    struct group *grp_ptr;
+    static char numstr[10];
 
+    if((grp_ptr = getgrgid(gid)) == NULL){
+        sprintf(numstr, "%d", gid);
+        return numstr;
+    }else{
+        return grp_ptr -> gr_name;
+    }
 }
+
