@@ -15,10 +15,19 @@ void mode_to_letters(int ,char[]);//将模式字段转化为字符
 char * uid_to_name(uid_t);//将用户ID转化为字符串
 char * gid_to_name(gid_t);//将组ID转化为字符串
 void getArgs(int argc,char *argv[]);//获取命令行参数
+void restored_ls(struct dirent *);//存储文件名
+/*快排 排序字符串*/
+void swap(char** s1,char** s2);
+int compare(char* s1,char* s2);
+int partition(char** filenames,int start,int end);
+void sort(char** filenames,int start,int end);
 
 int file_cnt = 0;//ls命令四个一行
 int has_l = 0;
 int has_a = 0;
+
+char *filename[4096];
+int filenums = 0;
 
 
 int main(int argc, char *argv[])
@@ -59,30 +68,31 @@ void do_ls(char dirname[])
         perror("打开目录失败");
         exit(0);
     }else{
+
         while((direntp = readdir(dir_ptr)) != NULL){
-            if(has_l == 1 && has_a == 1){
-                dostat(direntp -> d_name);//调用下一函数
-            }else if(has_l == 1 && has_a == 0){
-                if(direntp -> d_name[0] != '.'){
-                    dostat(direntp -> d_name);
-                }
-            }else if(has_a == 1){ 
-                printf("%-10s",direntp -> d_name);
+            restored_ls(direntp);
+        }
+        sort(filename,0,filenums-1);
+        
+        if(has_l == 1){
+            for(int i = 0; i < filenums; i++){
+                //filename[filenums++] = dir -> d_name;
+                dostat(filename[i]);
+            }
+        }else{
+            for (int i = 0; i < filenums; i++){
+                printf("%-10s", filename[i]);
                 file_cnt++;
-                if(file_cnt % 5 == 0){
-                    printf("\n");
-                }
-            }else if(has_a == 0 && direntp -> d_name[0] !='.'){
-                printf("%-10s",direntp -> d_name);
-                file_cnt++;
-                if(file_cnt % 5 == 0){
+                if (file_cnt % 5 == 0){
                     printf("\n");
                 }
             }
         }
 
+        // for(int i = 0;i < filenums;i++){
+        //     free(filename[i]);
+        // }
 
-        
         int flag;
         if((flag = closedir(dir_ptr)) == -1){
             perror("关闭目录失败");
@@ -209,4 +219,55 @@ void getArgs(int argc, char *argv[])
     //     perror("参数过少");
     //     exit(EXIT_FAILURE);
     //}
+}
+
+void restored_ls(struct dirent* dir)
+{
+    char *result = dir -> d_name;
+    if(has_a == 0 && *result == '.'){
+        return;
+    }
+    filename[filenums++] = dir -> d_name;
+}
+
+void swap(char **s1, char **s2)
+{
+    char *temp = *s1;
+    *s1 = *s2;
+    *s2 = temp;
+}
+
+int compare(char *s1, char *s2)
+{
+    while(*s1 && *s2 && *s1 == *s2){
+        s1++;
+        s2++;
+    }
+    return *s1 - *s2;
+}
+
+int partition(char** filenames,int start,int end)
+{
+	if(!filenames){
+        return -1;
+    }
+	char* privot = filenames[start];
+	while(start < end){
+		while(start < end && compare(privot,filenames[end]) < 0)
+			--end;
+		swap(&filenames[start],&filenames[end]);
+		while(start < end && compare(privot,filenames[start]) >= 0)
+			++start;
+		swap(&filenames[start],&filenames[end]);
+	}
+	return start;
+}
+
+void sort(char ** filenames,int start,int end)
+{
+    if(start < end){
+        int position = partition(filename, start, end);
+        sort(filename, start, position - 1);
+        sort(filename, position + 1, end);
+    }
 }
