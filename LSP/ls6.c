@@ -1,51 +1,95 @@
 #include<stdio.h>
 #include<stdlib.h>
 #include<dirent.h>
+#include<limits.h>
 #include<sys/stat.h>
 #include<sys/types.h>
 #include<pwd.h>
 #include<grp.h>
 #include<string.h>
 #include<unistd.h>
-
-void do_ls(char[]);//执行ls基本操作
+#include<errno.h>
+/*修改restored*/
+/*加入 -r*/
+void do_ls(const char[]);//执行ls基本操作
 void dostat(char *);//获取文件信息
 void show_file_info(char *, struct stat *);//展示从stat获取的信息
 void mode_to_letters(int ,char[]);//将模式字段转化为字符
 char * uid_to_name(uid_t);//将用户ID转化为字符串
 char * gid_to_name(gid_t);//将组ID转化为字符串
 void getArgs(int, char **);//获取命令行参数
-void restored_ls(struct dirent *);//存储文件名
-void color_print(char*,int);
+void restored_ls(struct dirent *, const char *);//存储文件名
+void color_print(char*,int);//染色
+void show_without_l_with_r(char **);
+void show_without_l(char **);//整合重复函数
+void do_R(const char dirname[]);//递归实现
+ino_t get_inode(const char *);
+mode_t get_mode(const char *);
+unsigned long get_st_blocks(char *);
+
 /*快排 排序字符串*/
 void swap(char** s1,char** s2);
 int compare(char* s1,char* s2);
 int partition(char** filenames,int start,int end);
 void sort(char** filenames,int start,int end);
+/*按照最后修改时间排序*/
+void swap_M(char *s1,char *s2);
+void sort_by_ModificationTime(char **, int);
 
-int file_cnt = 0;//ls命令四个一行
-int has_l = 0;
-int has_a = 0;
-int has_i = 0;
 
-char *filename[];
+int file_cnt = 0;
+/*定义来自man手册*/
+int has_l = 0;//use a long listing format
+int has_a = 0;//do not ignore entries starting with .
+int has_i = 0;//print the index number of each file
+int has_r = 0;//reverse older while sorting
+int has_t = 0;//sort by modification time,newest first
+int has_s = 0;//print the allocated size of each file, in blocks
+int has_R = 0;//list subdirectories recursively
+
+char **filename;
 int filenums = 0;
-char *dirname[];
+char **dirname;
 int dirnums = 0;
+mode_t *filetime;
+mode_t temp_time;
 
 int main(int argc, char *argv[])
 {
+    filename = (char **)malloc(sizeof(char*) * 20000);
+    dirname = (char **)malloc(sizeof(char*) * 20000);
+    for(int i = 0;i < 20000;i++){
+        filename[i] = (char*)malloc(256);
+        dirname[i] = (char*)malloc(256);
+    }
+    filetime = (mode_t *)malloc(sizeof(mode_t) * 20000);
+    
     getArgs(argc, argv);
-
     if(dirnums == 0){
         dirname[dirnums++] = ".";
     }
+
     sort(dirname, 0, dirnums-1);
 
-    for(int i = 0; i < dirnums; i++){
-        do_ls(dirname[i]);
-    }
+    // if(has_R){
+    //     for(int i = 0; i < dirnums; i++){
+    //         do_R(dirname[i]);
+    //     }
+    // }else{
+        if(has_r == 0){
+            for(int i = 0; i < dirnums; i++){
+                do_ls(dirname[i]);
+            }
+        }else if(has_r == 1){
+            for(int i = dirnums-1; i >= 0; i--){
+                do_ls(dirname[i]);
+            }
+        }
+    //}
 
+    free(filename);
+    free(dirname);
+    free(filetime);
     return 0;
 }
 
@@ -57,6 +101,11 @@ void getArgs(int argc, char *argv[]){
                 if(**argv == 'a')   has_a = 1;
                 if(**argv == 'l')   has_l = 1;
                 if(**argv == 'i')   has_i = 1;
+                if(**argv == 'r')   has_r = 1;
+                if(**argv == 't')   has_t = 1;
+                if(**argv == 'r')   has_r = 1;
+                if(**argv == 's')   has_s = 1;
+                if(**argv == 'R')   has_R = 1;
             }
         }else{
             dirname[dirnums++] = *argv;
@@ -64,53 +113,42 @@ void getArgs(int argc, char *argv[]){
     }
 }
 
-void do_ls(char dirname[])
+void do_ls(const char dirname[])
 //list files in directory called dirname
 {
     DIR *dir_ptr;
     struct dirent *direntp;
-    
+
     if((dir_ptr = opendir(dirname)) == NULL){
         perror("打开目录失败");
         exit(1);
     }else{
-
         while((direntp = readdir(dir_ptr)) != NULL){
-            restored_ls(direntp);
+            restored_ls(direntp,dirname);
         }
-        sort(filename,0,filenums-1);
+
+        if(has_t == 0){
+            sort(filename,0,filenums-1);
+        }else if(has_t == 1){
+            sort_by_ModificationTime(filename,filenums);
+        }
         
         if(has_l){
-            for(int i = 0; i < filenums; i++){
-                //filename[filenums++] = dir -> d_name;
-                dostat(filename[i]);
+            if(has_r == 1){
+                for(int i = filenums-1; i >= 0; i--){
+                    dostat(filename[i]);
+                }
+            }else {
+                for(int i = 0; i < filenums; i++){
+                    //filename[filenums++] = dir -> d_name;
+                    dostat(filename[i]);
+                }
             }
         }else{
-            for (int i = 0; i < filenums; i++){
-                if(has_i){
-                    struct stat info;
-                    if(stat(filename[i], &info) == -1){
-                        perror("在has_i获取信息失败");
-                    }
-                    printf("%ld     ", info.st_ino);
-                    color_print(filename[i], info.st_mode);
-                    //printf("%ld    %-10s",info.st_ino, filename[i]);
-                    file_cnt++;
-                    if (file_cnt % 2 == 0){
-                        printf("\n");
-                    }
-                }else{
-                    //printf("%-10s", filename[i]);
-                    struct stat info;
-                    if(stat(filename[i], &info) == -1){
-                        perror("在普通输出获取信息失败");
-                    }
-                    color_print(filename[i],info.st_mode);
-                    file_cnt++;
-                    if (file_cnt % 5 == 0){
-                        printf("\n");
-                    }
-                }
+            if (has_r == 0){
+                show_without_l(filename);
+            }else if (has_r == 1){
+                show_without_l_with_r(filename);
             }
         }
 
@@ -126,18 +164,147 @@ void do_ls(char dirname[])
     }
 }
 
+void show_without_l(char** filename)
+{
+    for (int i = 0; i < filenums; i++){
+        if (has_i && !has_s){
+            ino_t file_ino = get_inode(filename[i]);
+            mode_t file_mode = get_mode(filename[i]);
+            printf("%-5ld", file_ino);
+            color_print(filename[i], file_mode);
+            file_cnt++;
+                if (file_cnt % 2 == 0){
+                    printf("\n");
+                }
+            }else if(!has_i && has_s){
+                unsigned long file_blo = get_st_blocks(filename[i]);
+                mode_t file_mode = get_mode(filename[i]);
+                printf("%-5ld", file_blo);
+                color_print(filename[i], file_mode);
+                file_cnt++;
+                    if (file_cnt % 2 == 0){
+                        printf("\n");
+                    }
+            }else if(has_i && has_s){
+                ino_t file_ino = get_inode(filename[i]);
+                mode_t file_mode = get_mode(filename[i]);
+                unsigned long blo = get_st_blocks(filename[i]);
+                printf("%-5ld", file_ino);
+                printf("%-5ld", blo);
+                color_print(filename[i], file_mode);
+                file_cnt++;
+                if (file_cnt % 2 == 0){
+                    printf("\n");
+                }
+            }else{
+                mode_t file_mode = get_mode(filename[i]);
+                color_print(filename[i], file_mode);
+                file_cnt++;
+                if (file_cnt % 5 == 0){
+                    printf("\n");
+                }
+            }
+        }
+}
+
+void show_without_l_with_r(char ** filename)
+{
+    for (int i = filenums-1; i >= 0; i--){
+        if (has_i && !has_s){
+            ino_t file_ino = get_inode(filename[i]);
+            mode_t file_mode = get_mode(filename[i]);
+            printf("%-5ld", file_ino);
+            color_print(filename[i], file_mode);
+            file_cnt++;
+                if (file_cnt % 2 == 0){
+                    printf("\n");
+                }
+            }else if(!has_i && has_s){
+                unsigned long file_blo = get_st_blocks(filename[i]);
+                mode_t file_mode = get_mode(filename[i]);
+                printf("%-5ld", file_blo);
+                color_print(filename[i], file_mode);
+                file_cnt++;
+                    if (file_cnt % 2 == 0){
+                        printf("\n");
+                    }
+            }else if(has_i && has_s){
+                ino_t file_ino = get_inode(filename[i]);
+                mode_t file_mode = get_mode(filename[i]);
+                unsigned long blo = get_st_blocks(filename[i]);
+                printf("%-5ld", file_ino);
+                printf("%-5ld", blo);
+                color_print(filename[i], file_mode);
+                file_cnt++;
+                if (file_cnt % 2 == 0){
+                    printf("\n");
+                }
+            }else{
+                mode_t file_mode = get_mode(filename[i]);
+                color_print(filename[i], file_mode);
+                file_cnt++;
+                if (file_cnt % 5 == 0){
+                    printf("\n");
+                }
+            }
+        }
+}
+
+ino_t get_inode(const char *this_name)
+{
+    struct stat info;
+    while(stat (this_name, &info) == -1){
+        chdir("..");
+        if(get_inode(".") == get_inode("..")){
+            break;
+        }
+    }
+
+    return info.st_ino;
+}
+
+mode_t get_mode(const char *this_name)
+{
+    struct stat info;
+    while(stat (this_name, &info) == -1){
+        chdir("..");
+        if(get_inode(".") == get_inode("..")){
+            break;
+        }
+    }
+
+    return info.st_mode;
+}
+
+unsigned long get_st_blocks(char *this_name)
+{
+    struct stat info;
+    while(stat (this_name, &info) == -1){
+        chdir("..");
+        if(get_inode(".") == get_inode("..")){
+            break;
+        }
+    }
+
+    return info.st_blocks;
+}
+
 void dostat(char *filename)
 {
     struct stat info;//存放stat结构体数据的地址
-    if(stat(filename, &info) == -1){//解析filename，将得到的信息放在info
-        perror("获取信息失败");
-    }else{
-        show_file_info(filename,&info);//调用下一函数
+    while(stat(filename, &info) == -1){//解析filename，将得到的信息放在info
+        chdir("..");
+        if(get_inode(".") == get_inode("..")){
+            break;
+        }
+        //perror("在dostat获取信息失败");
     }
+
+    show_file_info(filename,&info);//调用下一函数
+    
 }
 
 void show_file_info(char *filename, struct stat *info_p)//此处的info_p就是stat放东西的info位
-//display the info about filename
 {
     char *ctime();
     char modestr[11];//一类型位+九权限位+'\0'
@@ -145,7 +312,10 @@ void show_file_info(char *filename, struct stat *info_p)//此处的info_p就是s
     mode_to_letters(info_p -> st_mode, modestr);
 
     if(has_i == 1){
-        printf("%ld ",info_p -> st_ino);
+        printf("%-5ld",info_p -> st_ino);
+    }
+    if(has_s == 1){
+        printf("%-5ld",info_p -> st_blocks);
     }
     printf("%s ", modestr);//权限字符串
     printf("%d ",(int)info_p -> st_nlink);//链接数
@@ -251,7 +421,7 @@ char * gid_to_name(gid_t gid)//此处的gid值即为stat函数所读到的st_gid
     }
 }
 
-void restored_ls(struct dirent* dir)
+void restored_ls(struct dirent* dir,const char* dirname)
 {
     char *result = dir -> d_name;
     if(has_a == 0 && *result == '.'){
@@ -285,20 +455,49 @@ int compare(char *s1, char *s2)
     return *s1 - *s2;
 }
 
-int partition(char** filenames,int start,int end)
+int partition(char** filename,int start,int end)
 {
-	if(!filenames){
+	if(!filename){
         return -1;
     }
-	char* privot = filenames[start];
+	char* privot = filename[start];
 	while(start < end){
-		while(start < end && compare(privot,filenames[end]) < 0)
+		while(start < end && compare(privot,filename[end]) < 0)
 			--end;
-		swap(&filenames[start],&filenames[end]);
-		while(start < end && compare(privot,filenames[start]) >= 0)
+		swap(&filename[start],&filename[end]);
+		while(start < end && compare(privot,filename[start]) >= 0)
 			++start;
-		swap(&filenames[start],&filenames[end]);
+		swap(&filename[start],&filename[end]);
 	}
 	return start;
 }
 
+void sort_by_ModificationTime(char **filename, int nums)
+{
+    if(!filename){
+        perror("文件名错误");
+        exit(1);
+    }
+    struct stat info;
+    for(int i=0; i<nums; i++){
+        if(stat(filename[i],&info) == -1){
+            perror("在sort_BY_M执行stat失败");
+            //chdir("..");
+        }
+        filetime[i] = info.st_mtime;
+    }
+    for(int i = 0; i < nums-1; i++){
+        for(int j = 0; j < nums-1-i; j++){
+            if(filetime[j] < filetime[j+1]){
+                temp_time = filetime[j];
+                filetime[j] = filetime[j+1];
+                filetime[j+1] = temp_time;//时间交换
+                char *temp = (char*)malloc(sizeof(char) * 4096);
+                strcpy(temp,filename[j]);  
+                strcpy(filename[j],filename[j+1]);
+                strcpy(filename[j+1],temp);
+                free(temp);
+            }
+        }
+    }
+}
