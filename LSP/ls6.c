@@ -22,7 +22,9 @@ void restored_ls(struct dirent *, const char *);//存储文件名
 void color_print(char*,int);//染色
 void show_without_l_with_r(char **);
 void show_without_l(char **);//整合重复函数
-void do_R(const char dirname[]);//递归实现
+void do_R(char *);//递归实现
+void take_out(char *,char *);
+
 ino_t get_inode(const char *);
 mode_t get_mode(const char *);
 unsigned long get_st_blocks(char *);
@@ -71,11 +73,9 @@ int main(int argc, char *argv[])
 
     sort(dirname, 0, dirnums-1);
 
-    // if(has_R){
-    //     for(int i = 0; i < dirnums; i++){
-    //         do_R(dirname[i]);
-    //     }
-    // }else{
+    if(has_R){
+        do_R(dirname[0]);
+    }else{
         if(has_r == 0){
             for(int i = 0; i < dirnums; i++){
                 do_ls(dirname[i]);
@@ -85,7 +85,7 @@ int main(int argc, char *argv[])
                 do_ls(dirname[i]);
             }
         }
-    //}
+    }
 
     free(filename);
     free(dirname);
@@ -480,9 +480,9 @@ void sort_by_ModificationTime(char **filename, int nums)
     }
     struct stat info;
     for(int i=0; i<nums; i++){
-        if(stat(filename[i],&info) == -1){
-            perror("在sort_BY_M执行stat失败");
-            //chdir("..");
+        while(stat(filename[i],&info) == -1){
+            //perror("在sort_BY_M执行stat失败");
+            chdir("..");
         }
         filetime[i] = info.st_mtime;
     }
@@ -499,5 +499,97 @@ void sort_by_ModificationTime(char **filename, int nums)
                 free(temp);
             }
         }
+    }
+}
+
+void do_R(char *name)
+{
+    DIR *dir;
+    struct dirent *ptr;
+    int i, count = 0;
+    int f_maxlen = 0;
+    struct stat buf;
+    char name_dir[10000];
+
+    if (chdir(name) < 0){ //将输入的目录改为当前目录
+        perror("chdir");
+    }
+    if (getcwd(name_dir, 10000) < 0)
+    {
+        perror("getcwd"); //获取当前目录的绝对路径
+    }
+    printf("%s:\n", name_dir);
+
+    if ((dir = opendir(name_dir)) == NULL)//用新获得路径打开目录
+    {
+        perror("opendir");
+    }
+    while ((ptr = readdir(dir)) != NULL)
+    {
+        if (f_maxlen < strlen(ptr->d_name))
+            f_maxlen = strlen(ptr->d_name);
+        count++;
+    }
+    int flag_close = 0;
+    if((flag_close = closedir(dir)) == -1){
+        perror("closedir");
+    }
+
+    //动态数组
+    char **filenames = (char **)malloc(count * sizeof(char *)); //要进行初始化
+    memset(filenames, 0, sizeof(char *) * count);
+
+    for (i = 0; i < count; i++)
+    {
+        filenames[i] = (char *)malloc(256 * sizeof(char));
+        memset(filenames[i], 0, sizeof(char) * 256);
+    }
+
+    int j, len = strlen(name_dir);
+    dir = opendir(name_dir);
+    for (i = 0; i < count; i++)
+    {
+        if ((ptr = readdir(dir)) == NULL){
+            perror("readdir");
+        }
+
+        strcat(filenames[i], ptr->d_name);
+    }
+    for (i = 0; i < count; i++){
+        do_ls(filenames[i]);
+    }
+    printf("\n");
+
+    for (i = 0; i < count; i++)
+    {
+        if (lstat(filenames[i], &buf) == -1){
+            perror("stat");
+        }
+        if (strcmp(filenames[i], "..") == 0){
+            continue;
+        }
+        if (strcmp(filenames[i], ".") == 0){
+            continue;
+        }
+
+        if (S_ISDIR(buf.st_mode))//是目录
+        {
+            do_ls(filenames[i]);
+        }
+        else if (!S_ISDIR(buf.st_mode))//不是目录
+        {
+            continue;
+        }
+        chdir("../"); //处理完一个目录后返回上一层
+    }
+
+    for (i = 0; i < count; i++)
+    {
+        free(filenames[i]);
+    }
+    free(filenames);
+    
+    if((flag_close = closedir(dir)) == -1){
+        perror("closedir");
     }
 }
