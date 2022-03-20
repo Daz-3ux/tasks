@@ -578,7 +578,8 @@ void do_R(char *name)
         }
         else if (!S_ISDIR(buf.st_mode))//不是目录
         {
-            continue;
+            mode_t file_mode = get_mode(filename[i]);
+            color_print(filename[i], file_mode);
         }
         chdir("../"); //处理完一个目录后返回上一层
     }
