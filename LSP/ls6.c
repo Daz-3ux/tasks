@@ -249,11 +249,12 @@ void show_without_l_with_r(char ** filename)
 ino_t get_inode(const char *this_name)
 {
     struct stat info;
-    while(stat (this_name, &info) == -1){
-        chdir("..");
-        if(get_inode(".") == get_inode("..")){
-            break;
-        }
+    if(stat (this_name, &info) == -1){
+        perror (this_name);
+        //chdir("..");
+        // if(get_inode(".") == get_inode("..")){
+        //     break;
+        // }
     }
 
     return info.st_ino;
@@ -262,11 +263,12 @@ ino_t get_inode(const char *this_name)
 mode_t get_mode(const char *this_name)
 {
     struct stat info;
-    while(stat (this_name, &info) == -1){
-        chdir("..");
-        if(get_inode(".") == get_inode("..")){
-            break;
-        }
+    if(stat (this_name, &info) == -1){
+        perror(this_name);
+        // chdir("..");
+        // if(get_inode(".") == get_inode("..")){
+        //     break;
+        // }
     }
 
     return info.st_mode;
@@ -275,11 +277,12 @@ mode_t get_mode(const char *this_name)
 unsigned long get_st_blocks(char *this_name)
 {
     struct stat info;
-    while(stat (this_name, &info) == -1){
-        chdir("..");
-        if(get_inode(".") == get_inode("..")){
-            break;
-        }
+    if(stat (this_name, &info) == -1){
+        perror(this_name);
+        // chdir("..");
+        // if(get_inode(".") == get_inode("..")){
+        //     break;
+        // }
     }
 
     return info.st_blocks;
@@ -288,11 +291,12 @@ unsigned long get_st_blocks(char *this_name)
 void dostat(char *filename)
 {
     struct stat info;//存放stat结构体数据的地址
-    while(stat(filename, &info) == -1){//解析filename，将得到的信息放在info
-        chdir("..");
-        if(get_inode(".") == get_inode("..")){
-            break;
-        }
+    if(stat(filename, &info) == -1){//解析filename，将得到的信息放在info
+        //chdir("..");
+        //if(get_inode(".") == get_inode("..")){
+        //    break;
+        //}
+        perror(filename);
     }
 
     show_file_info(filename,&info);//调用下一函数
@@ -432,9 +436,9 @@ void sort_by_ModificationTime(char **filename, int nums)
     }
     struct stat info;
     for(int i=0; i<nums; i++){
-        while(stat(filename[i],&info) == -1){
-            //perror("在sort_BY_M执行stat失败");
-            chdir("..");
+        if(stat(filename[i],&info) == -1){
+            perror("在sort_BY_M执行stat失败");
+            //chdir("..");
         }
         filetime[i] = info.st_mtime;
     }
