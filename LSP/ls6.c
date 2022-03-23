@@ -18,7 +18,6 @@ valgrind --tool=memcheck --leak-check=full --show-reachable=yes -s ./ls8
 #include<string.h>
 #include<unistd.h>
 #include<errno.h>
-#include<assert.h>
 /*修改restored*/
 /*加入 -r*/
 void do_ls(const char[]);//执行ls基本操作
@@ -33,13 +32,13 @@ void color_print(char*,int);//染色
 void show_without_l_with_r(char **);
 void show_without_l(char **);//整合重复函数
 void do_R(char *);//递归实现
-void take_out(char *,char *);
+void do_lsR(const char dirname[]);
+
 
 ino_t get_inode(const char *);
 mode_t get_mode(const char *);
 unsigned long get_st_blocks(char *);
 
-void sort(char** filenames,int filenums);
 /*按照最后修改时间排序*/
 void swap_M(char *s1,char *s2);
 void sort_by_ModificationTime(char **, int);
@@ -294,7 +293,6 @@ void dostat(char *filename)
         if(get_inode(".") == get_inode("..")){
             break;
         }
-        //perror("在dostat获取信息失败");
     }
 
     show_file_info(filename,&info);//调用下一函数
@@ -309,10 +307,10 @@ void show_file_info(char *filename, struct stat *info_p)//此处的info_p就是s
     mode_to_letters(info_p -> st_mode, modestr);
 
     if(has_i == 1){
-        printf("%-5ld",info_p -> st_ino);
+        printf("%-10ld",info_p -> st_ino);
     }
     if(has_s == 1){
-        printf("%-5ld",info_p -> st_blocks);
+        printf("%-10ld",info_p -> st_blocks);
     }
     printf("%s  ", modestr);//权限字符串
     printf("%d  ",(int)info_p -> st_nlink);//链接数
@@ -459,29 +457,17 @@ void sort_by_ModificationTime(char **filename, int nums)
 void do_R(char path[])
 {
     printf("%s:\n", path);
+
     DIR *dir_ptr;
     struct dirent *direntp;
     if ((dir_ptr = opendir(path)) == NULL) //打开目录
         fprintf(stderr, "cannot open %s\n", path);
     else
     {
-        while ((direntp = readdir(dir_ptr)) != NULL) //读取当前目录文件
-        {
-            restored_ls(direntp);
-        }
-        qsort(filename,filenums,sizeof(filename[0]),cmp);
-
-        for (int j = 0; j < filenums; j++)
-        {
-            struct stat info;
-            if (stat(path, &info) == -1){
-                perror(path);
-            }
-            color_print(filename[j], info.st_mode);
-        }
+        do_ls(path);
     }
-
     printf("\n");
+    filenums = 0;
     if((flag = closedir(dir_ptr)) == -1){
         perror("fault:closedir in R");
     }
@@ -498,7 +484,7 @@ void do_R(char path[])
             if (stat(temp, &info) == -1){
                 perror("cannot stst in recursion");
             }
-            if (S_ISDIR(info.st_mode)){ //判断是否为目录，如果是目录就进入递归
+            if (S_ISDIR(info.st_mode)){ //判断,如果是目录就进入递归
                 do_R(temp);
             }
         }
