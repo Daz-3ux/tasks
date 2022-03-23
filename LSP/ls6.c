@@ -1,3 +1,12 @@
+/*
+内存泄露检测：
+1. 
+gcc -fsanitize=address -g ls8.c -o ls8
+2.
+gcc -g ls8.c -o ls8
+valgrind --tool=memcheck --leak-check=full --show-reachable=yes -s ./ls8
+*/
+
 #include<stdio.h>
 #include<stdlib.h>
 #include<dirent.h>
@@ -9,6 +18,7 @@
 #include<string.h>
 #include<unistd.h>
 #include<errno.h>
+#include<assert.h>
 /*修改restored*/
 /*加入 -r*/
 void do_ls(const char[]);//执行ls基本操作
@@ -18,7 +28,7 @@ void mode_to_letters(int ,char[]);//将模式字段转化为字符
 char * uid_to_name(uid_t);//将用户ID转化为字符串
 char * gid_to_name(gid_t);//将组ID转化为字符串
 void getArgs(int, char **);//获取命令行参数
-void restored_ls(struct dirent *, const char *);//存储文件名
+void restored_ls(struct dirent *);//存储文件名
 void color_print(char*,int);//染色
 void show_without_l_with_r(char **);
 void show_without_l(char **);//整合重复函数
@@ -29,11 +39,7 @@ ino_t get_inode(const char *);
 mode_t get_mode(const char *);
 unsigned long get_st_blocks(char *);
 
-/*快排 排序字符串*/
-void swap(char** s1,char** s2);
-int compare(char* s1,char* s2);
-int partition(char** filenames,int start,int end);
-void sort(char** filenames,int start,int end);
+void sort(char** filenames,int filenums);
 /*按照最后修改时间排序*/
 void swap_M(char *s1,char *s2);
 void sort_by_ModificationTime(char **, int);
@@ -48,50 +54,45 @@ int has_r = 0;//reverse older while sorting
 int has_t = 0;//sort by modification time,newest first
 int has_s = 0;//print the allocated size of each file, in blocks
 int has_R = 0;//list subdirectories recursively
+int flag = 1;
+int flag_have_dir = 0;
 
-char **filename;
+char *filename[4096];
 int filenums = 0;
-char **dirname;
-int dirnums = 0;
+char *dirname[2];
 mode_t *filetime;
 mode_t temp_time;
 
+int cmp(const void *s1, const void *s2)
+{
+    //(s1 && s2);
+    return strcmp(*(char**)s1, *(char**)s2);
+}
+
 int main(int argc, char *argv[])
 {
-    filename = (char **)malloc(sizeof(char*) * 20000);
-    dirname = (char **)malloc(sizeof(char*) * 20000);
-    for(int i = 0;i < 20000;i++){
-        filename[i] = (char*)malloc(256);
-        dirname[i] = (char*)malloc(256);
-    }
     filetime = (mode_t *)malloc(sizeof(mode_t) * 20000);
     
     getArgs(argc, argv);
-    if(dirnums == 0){
-        dirname[dirnums++] = ".";
-    }
 
-    sort(dirname, 0, dirnums-1);
-
-    if(has_R){
-        do_R(dirname[0]);
+    if(argc == 1){
+        do_ls(".");
     }else{
-        if(has_r == 0){
-            for(int i = 0; i < dirnums; i++){
-                do_ls(dirname[i]);
-            }
-        }else if(has_r == 1){
-            for(int i = dirnums-1; i >= 0; i--){
-                do_ls(dirname[i]);
-            }
+        if(!has_R && !flag_have_dir){
+            do_ls(".");
+        }else if(!has_R && flag_have_dir){
+            do_ls(dirname[0]);
+        }else if(has_R && !flag_have_dir){
+            do_R(".");
+        }else if(has_R && flag_have_dir){
+            do_R(dirname[0]);
         }
     }
 
-    free(filename);
-    free(dirname);
     free(filetime);
     return 0;
 }
+
 
 void getArgs(int argc, char *argv[]){
     while(--argc){
@@ -108,7 +109,8 @@ void getArgs(int argc, char *argv[]){
                 if(**argv == 'R')   has_R = 1;
             }
         }else{
-            dirname[dirnums++] = *argv;
+            flag_have_dir = 1;
+            dirname[0] = *argv;
         }
     }
 }
@@ -124,11 +126,11 @@ void do_ls(const char dirname[])
         exit(1);
     }else{
         while((direntp = readdir(dir_ptr)) != NULL){
-            restored_ls(direntp,dirname);
+            restored_ls(direntp);
         }
 
         if(has_t == 0){
-            sort(filename,0,filenums-1);
+            qsort(filename,filenums,sizeof(filename[0]),cmp);
         }else if(has_t == 1){
             sort_by_ModificationTime(filename,filenums);
         }
@@ -152,11 +154,6 @@ void do_ls(const char dirname[])
             }
         }
 
-        // for(int i = 0;i < filenums;i++){
-        //     free(filename[i]);
-        // }
-
-        int flag;
         if((flag = closedir(dir_ptr)) == -1){
             perror("关闭目录失败");
             exit(1);
@@ -317,16 +314,15 @@ void show_file_info(char *filename, struct stat *info_p)//此处的info_p就是s
     if(has_s == 1){
         printf("%-5ld",info_p -> st_blocks);
     }
-    printf("%s ", modestr);//权限字符串
-    printf("%d ",(int)info_p -> st_nlink);//链接数
+    printf("%s  ", modestr);//权限字符串
+    printf("%d  ",(int)info_p -> st_nlink);//链接数
     printf("%-8s",uid_to_name(info_p -> st_uid));//所属用户
     printf("%-8s",gid_to_name(info_p -> st_gid));//所属用户组
-    printf("%8ld ",(long)info_p -> st_size);//内存大小
-    printf("%.12s ",4+ctime(&info_p -> st_mtime));//最后修改时间
+    printf("%8ld    ",(long)info_p -> st_size);//内存大小
+    printf("%.12s   ",4+ctime(&info_p -> st_mtime));//最后修改时间
     //printf("%s\n",filename);//文件名
     color_print(filename, info_p -> st_mode);
     putchar('\n');
-
 }
 
 #define S_ISEXEC(m) (((m)&(0000111))!=(0))//检测是否为可执行文件
@@ -421,55 +417,13 @@ char * gid_to_name(gid_t gid)//此处的gid值即为stat函数所读到的st_gid
     }
 }
 
-void restored_ls(struct dirent* dir,const char* dirname)
+void restored_ls(struct dirent* dir)
 {
     char *result = dir -> d_name;
     if(has_a == 0 && *result == '.'){
         return;
     }
     filename[filenums++] = dir -> d_name;
-}
-
-void sort(char ** filenames,int start,int end)
-{
-    if(start < end){
-        int position = partition(filename, start, end);
-        sort(filename, start, position - 1);
-        sort(filename, position + 1, end);
-    }
-}
-
-void swap(char **s1, char **s2)
-{
-    char *temp = *s1;
-    *s1 = *s2;
-    *s2 = temp;
-}
-
-int compare(char *s1, char *s2)
-{
-    while(*s1 && *s2 && *s1 == *s2){
-        s1++;
-        s2++;
-    }
-    return *s1 - *s2;
-}
-
-int partition(char** filename,int start,int end)
-{
-	if(!filename){
-        return -1;
-    }
-	char* privot = filename[start];
-	while(start < end){
-		while(start < end && compare(privot,filename[end]) < 0)
-			--end;
-		swap(&filename[start],&filename[end]);
-		while(start < end && compare(privot,filename[start]) >= 0)
-			++start;
-		swap(&filename[start],&filename[end]);
-	}
-	return start;
 }
 
 void sort_by_ModificationTime(char **filename, int nums)
@@ -502,92 +456,51 @@ void sort_by_ModificationTime(char **filename, int nums)
     }
 }
 
-void do_R(char *name)
+void do_R(char path[])
 {
-    DIR *dir;
-    struct dirent *ptr;
-    int i, count = 0;
-    int f_maxlen = 0;
-    struct stat buf;
-    char name_dir[10000];
-
-    if (chdir(name) < 0){ //将输入的目录改为当前目录
-        perror("chdir");
-    }
-    if (getcwd(name_dir, 10000) < 0)
+    printf("%s:\n", path);
+    DIR *dir_ptr;
+    struct dirent *direntp;
+    if ((dir_ptr = opendir(path)) == NULL) //打开目录
+        fprintf(stderr, "cannot open %s\n", path);
+    else
     {
-        perror("getcwd"); //获取当前目录的绝对路径
-    }
-    printf("%s:\n", name_dir);
-
-    if ((dir = opendir(name_dir)) == NULL)//用新获得路径打开目录
-    {
-        perror("opendir");
-    }
-    while ((ptr = readdir(dir)) != NULL)
-    {
-        count++;
-    }
-    int flag_close = 0;
-    if((flag_close = closedir(dir)) == -1){
-        perror("closedir");
-    }
-
-    //动态数组
-    char **filenames = (char **)malloc(count * sizeof(char *)); //要进行初始化
-    memset(filenames, 0, sizeof(char *) * count);
-
-    for (i = 0; i < count; i++)
-    {
-        filenames[i] = (char *)malloc(256 * sizeof(char));
-        memset(filenames[i], 0, sizeof(char) * 256);
-    }
-
-    dir = opendir(name_dir);
-    for (i = 0; i < count; i++)
-    {
-        if ((ptr = readdir(dir)) == NULL){
-            perror("readdir");
+        while ((direntp = readdir(dir_ptr)) != NULL) //读取当前目录文件
+        {
+            restored_ls(direntp);
         }
+        qsort(filename,filenums,sizeof(filename[0]),cmp);
 
-        strcat(filenames[i], ptr->d_name);
+        for (int j = 0; j < filenums; j++)
+        {
+            struct stat info;
+            if (stat(path, &info) == -1){
+                perror(path);
+            }
+            color_print(filename[j], info.st_mode);
+        }
     }
-    for (i = 0; i < count; i++){
-        do_ls(filenames[i]);
-    }
+
     printf("\n");
-
-    for (i = 0; i < count; i++)
-    {
-        if (lstat(filenames[i], &buf) == -1){
-            perror("stat");
-        }
-        if (strcmp(filenames[i], "..") == 0){
-            continue;
-        }
-        if (strcmp(filenames[i], ".") == 0){
-            continue;
-        }
-
-        if (S_ISDIR(buf.st_mode))//是目录
-        {
-            do_ls(filenames[i]);
-        }
-        else if (!S_ISDIR(buf.st_mode))//不是目录
-        {
-            mode_t file_mode = get_mode(filename[i]);
-            color_print(filename[i], file_mode);
-        }
-        chdir("../"); //处理完一个目录后返回上一层
+    if((flag = closedir(dir_ptr)) == -1){
+        perror("fault:closedir in R");
     }
 
-    for (i = 0; i < count; i++)
-    {
-        free(filenames[i]);
-    }
-    free(filenames);
-    
-    if((flag_close = closedir(dir)) == -1){
-        perror("closedir");
+    if ((dir_ptr = opendir(path)) == NULL)//目录递归
+        fprintf(stderr, "cannot open %s\n", path);
+    else{
+        while ((direntp = readdir(dir_ptr)) != NULL){
+            if (strcmp(direntp->d_name, ".") == 0 || strcmp(direntp->d_name, "..") == 0)
+                continue;
+            struct stat info;
+            char temp[4096];
+            sprintf(temp, "%s/%s", path, direntp->d_name);
+            if (stat(temp, &info) == -1){
+                perror("cannot stst in recursion");
+            }
+            if (S_ISDIR(info.st_mode)){ //判断是否为目录，如果是目录就进入递归
+                do_R(temp);
+            }
+        }
     }
 }
