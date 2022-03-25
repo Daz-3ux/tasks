@@ -43,7 +43,6 @@ unsigned long get_st_blocks(char *);
 void swap_M(char *s1,char *s2);
 void sort_by_ModificationTime(char **, int);
 
-
 int file_cnt = 0;
 /*定义来自man手册*/
 int has_l = 0;//use a long listing format
@@ -54,13 +53,15 @@ int has_t = 0;//sort by modification time,newest first
 int has_s = 0;//print the allocated size of each file, in blocks
 int has_R = 0;//list subdirectories recursively
 int flag = 1;
+char *path;
 int flag_have_dir = 0;
 
 char *filename[4096];
 int filenums = 0;
-char *dirname[2];
 mode_t *filetime;
 mode_t temp_time;
+
+
 
 int cmp(const void *s1, const void *s2)
 {
@@ -80,11 +81,11 @@ int main(int argc, char *argv[])
         if(!has_R && !flag_have_dir){
             do_ls(".");
         }else if(!has_R && flag_have_dir){
-            do_ls(dirname[0]);
+            do_ls(path);
         }else if(has_R && !flag_have_dir){
             do_R(".");
         }else if(has_R && flag_have_dir){
-            do_R(dirname[0]);
+            do_R(path);
         }
     }
 
@@ -109,7 +110,8 @@ void getArgs(int argc, char *argv[]){
             }
         }else{
             flag_have_dir = 1;
-            dirname[0] = *argv;
+            path = *argv;
+            //temp_re[4096] = **argv;
         }
     }
 }
@@ -250,7 +252,7 @@ ino_t get_inode(const char *this_name)
 {
     struct stat info;
     if(stat (this_name, &info) == -1){
-        perror (this_name);
+        perror ("cannot stat in get_inode");
         //chdir("..");
         // if(get_inode(".") == get_inode("..")){
         //     break;
@@ -264,7 +266,7 @@ mode_t get_mode(const char *this_name)
 {
     struct stat info;
     if(stat (this_name, &info) == -1){
-        perror(this_name);
+        perror("cannot stat in get_mode");
         // chdir("..");
         // if(get_inode(".") == get_inode("..")){
         //     break;
@@ -278,7 +280,7 @@ unsigned long get_st_blocks(char *this_name)
 {
     struct stat info;
     if(stat (this_name, &info) == -1){
-        perror(this_name);
+        perror("cannot stat in get_st_blocks");
         // chdir("..");
         // if(get_inode(".") == get_inode("..")){
         //     break;
@@ -291,12 +293,14 @@ unsigned long get_st_blocks(char *this_name)
 void dostat(char *filename)
 {
     struct stat info;//存放stat结构体数据的地址
+    if(flag_have_dir){
+        chdir(path);
+    }
     if(stat(filename, &info) == -1){//解析filename，将得到的信息放在info
-        //chdir("..");
-        //if(get_inode(".") == get_inode("..")){
-        //    break;
-        //}
-        perror(filename);
+        perror("cannot stat in dostat");
+        char buf[80];
+        getcwd(buf, sizeof(buf));
+        printf("current working directory : %s\n", buf);
     }
 
     show_file_info(filename,&info);//调用下一函数
@@ -316,12 +320,12 @@ void show_file_info(char *filename, struct stat *info_p)//此处的info_p就是s
     if(has_s == 1){
         printf("%-10ld",info_p -> st_blocks);
     }
-    printf("%s  ", modestr);//权限字符串
-    printf("%d  ",(int)info_p -> st_nlink);//链接数
+    printf("%s\t", modestr);//权限字符串
+    printf("%d\t",(int)info_p -> st_nlink);//链接数
     printf("%-8s",uid_to_name(info_p -> st_uid));//所属用户
     printf("%-8s",gid_to_name(info_p -> st_gid));//所属用户组
-    printf("%8ld    ",(long)info_p -> st_size);//内存大小
-    printf("%.12s   ",4+ctime(&info_p -> st_mtime));//最后修改时间
+    printf("%8ld\t",(long)info_p -> st_size);//内存大小
+    printf("%.12s\t",4+ctime(&info_p -> st_mtime));//最后修改时间
     //printf("%s\n",filename);//文件名
     color_print(filename, info_p -> st_mode);
     putchar('\n');
@@ -436,9 +440,15 @@ void sort_by_ModificationTime(char **filename, int nums)
     }
     struct stat info;
     for(int i=0; i<nums; i++){
+        if(flag_have_dir){
+            chdir(path);
+        }
         if(stat(filename[i],&info) == -1){
             perror("在sort_BY_M执行stat失败");
             //chdir("..");
+            char buf[80];
+            getcwd(buf, sizeof(buf));
+            printf("current working directory : %s\n", buf);
         }
         filetime[i] = info.st_mtime;
     }
@@ -458,38 +468,76 @@ void sort_by_ModificationTime(char **filename, int nums)
     }
 }
 
+
+int flag_re = 0;
 void do_R(char path[])
 {
     printf("%s:\n", path);
-
+    chdir(path);
     DIR *dir_ptr;
     struct dirent *direntp;
-    if ((dir_ptr = opendir(path)) == NULL) //打开目录
+    if ((dir_ptr = opendir(path)) == NULL){//打开目录
         fprintf(stderr, "cannot open %s\n", path);
+        char buf[80];
+        getcwd(buf, sizeof(buf));
+        printf("current working directory : %s\n", buf);
+    }
+        
     else
     {
-        do_ls(path);
+        while((direntp = readdir(dir_ptr)) != NULL){
+            restored_ls(direntp);
+        }
+        if(has_t == 0){
+            qsort(filename,filenums,sizeof(filename[0]),cmp);
+        }else if(has_t == 1){
+            sort_by_ModificationTime(filename,filenums);
+        }
+        for(int i = 0;i < filenums;i++){
+            if(has_l){
+                char temp[4096];
+                sprintf(temp, "%s/%s", path, filename[i]);
+                dostat(temp);
+                continue;
+            }
+            struct stat info;
+            char temp1[4096];
+            sprintf(temp1, "%s/%s", path, filename[i]);
+            if (stat(temp1, &info) == -1){
+                perror(temp1);
+                char buf[80];
+                getcwd(buf, sizeof(buf));
+                printf("current working directory : %s\n", buf);
+            }
+            color_print(filename[i], info.st_mode);
+        }
     }
-    printf("\n");
+    
+    printf("\n\n");
+    closedir(dir_ptr);
     filenums = 0;
-    if((flag = closedir(dir_ptr)) == -1){
-        perror("fault:closedir in R");
-    }
+    
 
     if ((dir_ptr = opendir(path)) == NULL)//目录递归
         fprintf(stderr, "cannot open %s\n", path);
     else{
-        while ((direntp = readdir(dir_ptr)) != NULL){
-            if (strcmp(direntp->d_name, ".") == 0 || strcmp(direntp->d_name, "..") == 0)
+        while ((direntp = readdir(dir_ptr)) != NULL){//循环判断是否为目录
+            if (strcmp(direntp->d_name, ".") == 0 || strcmp(direntp->d_name, "..") == 0){
                 continue;
-            struct stat info;
-            char temp[4096];
-            sprintf(temp, "%s/%s", path, direntp->d_name);
-            if (stat(temp, &info) == -1){
-                perror("cannot stst in recursion");
             }
+            if (has_R == 1)
+            {
+                if (direntp->d_name[0] == '.')
+                    continue;
+            }
+            struct stat info;
+            char temp_re[4096];
+            sprintf(temp_re, "%s/%s", path, direntp->d_name);
+            stat(temp_re, &info);
+            char *t_temp = temp_re;
             if (S_ISDIR(info.st_mode)){ //判断,如果是目录就进入递归
-                do_R(temp);
+                do_R(temp_re);
+                flag_re = 1;
             }
         }
     }
