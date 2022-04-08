@@ -39,9 +39,12 @@ int printHistory(char COMMAND[MAX_CMD][MAX_CMD_LEN]);
 
 int main()
 {
-    my_signal();
+    //my_signal();
     while(1){
-        char *command = readline(BEGIN(49,34)"ypd-super-shell ￥$ "CLOSE);
+        char place[BUFFSIZE];
+        getcwd(place, BUFFSIZE);
+        printf("%s:", place);
+        char *command = readline(BEGIN(44,33)"ypd-super-shell ￥$ "CLOSE);
         if(!command){
             my_error("readline",__LINE__);
         }
@@ -54,11 +57,11 @@ int main()
     }
 }
 
-
-
-
 void parse(char *command)
 {
+/*
+command 为用户输入的命令
+*/
     //初始化argv与argc
     for(int i = 0; i < MAX_CMD; i++){
         argv[i] = NULL;
@@ -69,7 +72,7 @@ void parse(char *command)
     argc = 0;//命令数计数器
     
     strcpy(backupCommand, command);//备份命令
-    //下列操作会改变command数组
+    
     int j = 0;
     int len = strlen(command);
     for(int i = 0; i < len; i++){
@@ -86,8 +89,8 @@ void parse(char *command)
     if(j != 0){//处理命令行末尾
         COMMAND[argc][j] = '\0';
     }
-
-    /*处理解析内置命令
+    //下列操作会改变command数组
+    /*处理__内置命令__
     若输入ls -a则存为
     argv[0] = "ls"
     argv[1] = "-a"
@@ -109,7 +112,7 @@ void parse(char *command)
 
 void do_cmd(int argc, char **argv)
 {
-    char *buf;
+    char buf[1024];
     //识别输出重定向
     for(int j = 0;j < MAX_CMD; j++){
         if(strcmp(COMMAND[j], ">") == 0){
@@ -158,7 +161,11 @@ void do_cmd(int argc, char **argv)
             my_error("cd",__LINE__);
         }
     }else if(strcmp(COMMAND[0], "history") == 0){
-        printHistory(COMMAND);
+        HIST_ENTRY **history = NULL;
+        history = history_list();
+        for(int i = 0; history[i] != NULL; i++){
+            printf("%s\n",history[i] -> line);
+        }
     }else if(strcmp(COMMAND[0], "exit") == 0){
         printf("--------------GoodBye---------------\n");
         exit(0);
@@ -181,6 +188,7 @@ void do_cmd(int argc, char **argv)
     }
 }
 
+//buf实际为用户输入的command
 int command_with_OutRe(char *buf)
 {
 
@@ -191,25 +199,71 @@ int command_with_InRe(char *buf)
 }
 int command_with_ReOutInRed(char *buf)
 {
-
+    
 }
 int command_with_Pipe(char *buf)
 {
 
 }
+
 int command_with_Back(char *buf)
 {
+    char BackBuf[strlen(buf)];
+    memset(BackBuf, 0, strlen(buf));
+    //提取 & 前的命令
+    for(int i = 0; i < strlen(buf); i++){
+        BackBuf[i] = buf[i];
+        if(buf[i] == '&'){
+            BackBuf[i] = '\0';
+            BackBuf[i-1] = '\0';
+            break;
+        }
+    }
 
+    pid_t pid = fork();
+    if(pid < 0){
+        my_error("Fork",__LINE__);
+    }
+
+    if(pid == 0){
+        //FILE *freopen(const chat*pathname, const char*mode, FILE *stream);
+        freopen("/dev/null", "w", stdout); 
+        freopen("/dev/null", "r", stdin);
+        signal(SIGCHLD, SIG_IGN);
+        parse(BackBuf);
+        execvp(argv[0], argv);
+        my_error("execvp",__LINE__);
+    }else{
+        exit(0);//父进程直接退出
+    }
 }
 
+char curPath[BUFFSIZE];
 int callCd(int argc)
 {
-
+    int result = 1;
+    if(argc == 1) {
+        int ret = chdir("/home/yyn");
+        if(ret){
+            return 0;
+        }
+    }else{
+        int ret = chdir(COMMAND[1]);
+        if(ret){
+            return 0;
+        }
+    }
+    if(result){
+        char *res = getcwd(curPath, BUFFSIZE);
+        if(res == NULL){
+            my_error("cd getcwd",__LINE__);
+        }
+        //printf("cd to: %s\n",curPath);
+        return result;
+    }
+    return 0;
 }
-int printHistory(char COMMAND[MAX_CMD][MAX_CMD_LEN])
-{
 
-}
 
 void my_signal()
 {
