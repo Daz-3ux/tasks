@@ -38,6 +38,9 @@ int main(int argc, char *argv[])
             my_error("dup2",__LINE__);
         }
         close(thepipe[0]);
+        printf("%dhh\n",thepipe[0]);
+        printf("hh%d\n",thepipe[1]);
+        
         execlp(argv[2],argv[2],NULL);
         my_error("execlp",__LINE__);
     }else if(pid == 0){//子进程接收输入

@@ -26,7 +26,7 @@ void parse(char *);
 void do_cmd(int, char **);
 int command_with_OutRe(char *);
 int command_with_InRe(char *); 
-int command_with_ReOutInRed(char *);
+int command_with_OutRePlus(char *);
 int command_with_Pipe(char *);
 int command_with_Back(char *);
 
@@ -44,7 +44,7 @@ int main()
         char place[BUFFSIZE];
         getcwd(place, BUFFSIZE);
         printf("%s:", place);
-        char *command = readline(BEGIN(44,33)"ypd-super-shell ￥$ "CLOSE);
+        char *command = readline(BEGIN(33,33)"ypd-super-shell ￥$ "CLOSE);
         if(!command){
             my_error("readline",__LINE__);
         }
@@ -133,7 +133,7 @@ void do_cmd(int argc, char **argv)
     for(int j = 0;j < MAX_CMD; j++){
         if(strcmp(COMMAND[j], ">>") == 0){
             strcpy(buf,backupCommand);
-            int sample = command_with_ReOutInRed(buf);
+            int sample = command_with_OutRePlus(buf);
             return;
         }
     }
@@ -190,17 +190,179 @@ void do_cmd(int argc, char **argv)
 
 //buf实际为用户输入的command
 int command_with_OutRe(char *buf)
-{
+{//command > file
+    char OutFile[1024];
+    memset(OutFile, 0, BUFFSIZE);
+    int RedNum = 0;
+    for(int i = 0; buf[i]; i++){
+        if(buf[i] == '>'){
+            RedNum++;
+            break;
+        }
+    }
+    if(RedNum != 1){
+        my_error("error num of OutRe",__LINE__);
+    }
 
-}
-int command_with_InRe(char *buf)
-{
-
-}
-int command_with_ReOutInRed(char *buf)
-{
+    for(int i =0;i < argc; i++){//与分割好的命令逐个比较，确定重定向文件
+        if(strcmp(COMMAND[i], ">") == 0){
+            if(i+1 < argc){//因为有argv[argc] == NULL,所以不用<=
+                strcpy(OutFile,COMMAND[i+1]);
+            }else{
+                my_error("missing output file",__LINE__);
+            }
+        }
+    }
+    for (int j = 0; j < strlen(buf); j++) {
+        if (buf[j] == '>') {
+            buf[j - 1] = '\0';
+            break;
+        }
+    }
     
+    parse(buf);//重定向符号后面的为文件，所以需要重新解析命令
+    pid_t pid = fork();
+    if(pid < 0){
+        my_error("fork",__LINE__);
+    }
+    if(pid == 0){
+        int fd;
+        fd = open(OutFile, O_WRONLY | O_CREAT | O_TRUNC,7777);
+        if(fd < 0){
+            my_error("open",__LINE__);
+        }
+        dup2(fd,STDOUT_FILENO);//灵魂
+        execvp(argv[0], argv);
+        if(fd != STDOUT_FILENO){
+            close(fd);
+        }
+        my_error("fault argu",__LINE__);
+    }else{
+        int status;
+        waitpid(pid, &status, 0);
+        int err = WEXITSTATUS(status);
+        if(err){
+            printf("Error:%s\n",strerror(err));
+        }
+    }
 }
+
+int command_with_InRe(char *buf)
+{//command < file
+    char InFile[1024];
+    memset(InFile, 0, BUFFSIZE);
+    int InNum = 0;
+    for(int i = 0; buf[i]; i++){
+        if(buf[i] == '<'){
+            InNum++;
+            break;
+        }
+    }
+    if(InNum != 1){
+        my_error("error num of InRe",__LINE__);
+    }
+
+    for(int i =0;i < argc; i++){//与分割好的命令逐个比较，确定重定向文件
+        if(strcmp(COMMAND[i], "<") == 0){
+            if(i+1 < argc){
+                strcpy(InFile,COMMAND[i+1]);
+            }else{
+                my_error("missing output file",__LINE__);
+            }
+        }
+    }
+    for (int j = 0; j < strlen(buf); j++) {
+        if (buf[j] == '<') {
+            buf[j - 1] = '\0';
+            break;
+        }
+    }
+    
+    parse(buf);//重定向符号后面的为文件，所以需要重新解析命令
+    pid_t pid = fork();
+    if(pid < 0){
+        my_error("fork",__LINE__);
+    }
+    if(pid == 0){
+        int fd;
+        fd = open(InFile, O_RDONLY, 7777);
+        if(fd < 0){
+            my_error("open",__LINE__);
+        }
+        dup2(fd,STDIN_FILENO);//灵魂
+        execvp(argv[0], argv);
+        if(fd != STDIN_FILENO){
+            close(fd);
+        }
+        my_error("fault argu",__LINE__);
+    }else{
+        int status;
+        waitpid(pid, &status, 0);
+        int err = WEXITSTATUS(status);
+        if(err){
+            printf("Error:%s\n",strerror(err));
+        }
+    }
+}
+
+int command_with_OutRePlus(char *buf)
+{
+    char OutFileP[1024];
+    memset(OutFileP, 0, BUFFSIZE);
+    int RedPNum = 0;
+    for(int i = 0; buf[i]; i++){
+        if(buf[i] == '>' && buf[i+1] == '>'){
+            RedPNum++;
+            break;
+        }
+    }
+    if(RedPNum != 1){
+        my_error("error num of OutRe",__LINE__);
+    }
+
+    for(int i =0;i < argc; i++){//与分割好的命令逐个比较，确定重定向文件
+        if(strcmp(COMMAND[i], ">>") == 0){
+            if(i+1 <= argc){
+                strcpy(OutFileP,COMMAND[i+1]);
+            }else{
+                my_error("missing output fileP",__LINE__);
+            }
+        }
+    }
+    for (int j = 0; j < strlen(buf); j++) {
+        if (buf[j] == '>' && buf[j+1] == '>') {
+            buf[j - 1] = '\0';
+            break;
+        }
+    }
+    
+    parse(buf);//重定向符号后面的为文件，所以需要重新解析命令
+    pid_t pid = fork();
+    if(pid < 0){
+        my_error("fork",__LINE__);
+    }
+    if(pid == 0){
+        int fd;
+        fd = open(OutFileP,O_WRONLY|O_APPEND|O_CREAT,7777);
+        if(fd < 0){
+            my_error("open",__LINE__);
+        }
+        dup2(fd,STDOUT_FILENO);//灵魂
+        execvp(argv[0], argv);
+        if(fd != STDOUT_FILENO){
+            close(fd);
+        }
+        my_error("fault argu",__LINE__);
+    }else{
+        int status;
+        waitpid(pid, &status, 0);
+        int err = WEXITSTATUS(status);
+        if(err){
+            printf("Error:%s\n",strerror(err));
+        }
+    }
+}
+
 int command_with_Pipe(char *buf)
 {
 
@@ -276,8 +438,9 @@ void my_signal()
 
 void my_error(char *string, int line)
 {//myerror("malloc", __LINE__);
-    printf("***********************");
+    printf("***********************\n");
     fprintf(stderr, "Line:%d,error:\n", line);
     fprintf(stderr, "%s:%s\n", string, strerror(errno));
+    printf("***********************\n");
     exit(EXIT_FAILURE);
 }
