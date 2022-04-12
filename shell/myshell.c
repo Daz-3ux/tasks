@@ -39,7 +39,7 @@ int printHistory(char COMMAND[MAX_CMD][MAX_CMD_LEN]);
 
 int main()
 {
-    //my_signal();
+    my_signal();
     while(1){
         char place[BUFFSIZE];
         getcwd(place, BUFFSIZE);
@@ -89,13 +89,7 @@ command 为用户输入的命令
     if(j != 0){//处理命令行末尾
         COMMAND[argc][j] = '\0';
     }
-    //下列操作会改变command数组
-    /*处理__内置命令__
-    若输入ls -a则存为
-    argv[0] = "ls"
-    argv[1] = "-a"
-    */
-    //OUT 0 IN 1
+    /*处理__内置命令__*/
     argc = 0;
     int flg = OUT;
     for(int i = 0; command[i] != '\0'; i++){
@@ -117,7 +111,7 @@ void do_cmd(int argc, char **argv)
     for(int j = 0;j < MAX_CMD; j++){
         if(strcmp(COMMAND[j], ">") == 0){
             strcpy(buf,backupCommand);
-            int sample = command_with_OutRe(buf);
+            command_with_OutRe(buf);
             return;
         }
     }
@@ -125,7 +119,7 @@ void do_cmd(int argc, char **argv)
     for(int j = 0;j < MAX_CMD; j++){
         if(strcmp(COMMAND[j], "<") == 0){
             strcpy(buf,backupCommand);
-            int sample = command_with_InRe(buf);
+            command_with_InRe(buf);
             return;
         }
     }
@@ -133,7 +127,7 @@ void do_cmd(int argc, char **argv)
     for(int j = 0;j < MAX_CMD; j++){
         if(strcmp(COMMAND[j], ">>") == 0){
             strcpy(buf,backupCommand);
-            int sample = command_with_OutRePlus(buf);
+            command_with_OutRePlus(buf);
             return;
         }
     }
@@ -141,7 +135,7 @@ void do_cmd(int argc, char **argv)
     for(int j = 0;j < MAX_CMD; j++){
         if(strcmp(COMMAND[j], "|") == 0){
             strcpy(buf,backupCommand);
-            int sample = command_with_Pipe(buf);
+            command_with_Pipe(buf);
             return;
         }
     }
@@ -149,7 +143,7 @@ void do_cmd(int argc, char **argv)
     for(int j = 0;j < MAX_CMD; j++){
         if(strcmp(COMMAND[j], "&") == 0){
             strcpy(buf,backupCommand);
-            int sample = command_with_Back(buf);
+            command_with_Back(buf);
         }
     }
 
@@ -173,10 +167,10 @@ void do_cmd(int argc, char **argv)
         switch(pid = fork()){
             case -1:
                 my_error("fork",__LINE__);
-            case 0:
+            case 0://子进程执行任务
                 execvp(argv[0],argv);
                 my_error("execvp",__LINE__);
-            default:{
+            default:{//父进程等待子进程结束
                 int status;
                 waitpid(pid, &status, 0);//等待任何组进程
                 int err_num = WEXITSTATUS(status);//宏用来指出子进程是否正常退出
@@ -203,11 +197,12 @@ int command_with_OutRe(char *buf)
     if(RedNum != 1){
         my_error("error num of OutRe",__LINE__);
     }
-
+    int fg = 0;
     for(int i =0;i < argc; i++){//与分割好的命令逐个比较，确定重定向文件
         if(strcmp(COMMAND[i], ">") == 0){
             if(i+1 < argc){//因为有argv[argc] == NULL,所以不用<=
                 strcpy(OutFile,COMMAND[i+1]);
+                fg = i-1;
             }else{
                 my_error("missing output file",__LINE__);
             }
@@ -227,7 +222,7 @@ int command_with_OutRe(char *buf)
     }
     if(pid == 0){
         int fd;
-        fd = open(OutFile, O_WRONLY | O_CREAT | O_TRUNC,7777);
+        fd = open(OutFile, O_RDWR | O_CREAT | O_TRUNC,7777);
         if(fd < 0){
             my_error("open",__LINE__);
         }
@@ -343,7 +338,7 @@ int command_with_OutRePlus(char *buf)
     }
     if(pid == 0){
         int fd;
-        fd = open(OutFileP,O_WRONLY|O_APPEND|O_CREAT,7777);
+        fd = open(OutFileP,O_RDWR|O_APPEND|O_CREAT,7777);
         if(fd < 0){
             my_error("open",__LINE__);
         }
@@ -365,7 +360,62 @@ int command_with_OutRePlus(char *buf)
 
 int command_with_Pipe(char *buf)
 {
+    int PipeNum = 0;
+    int i,j;
+    for(j = 0; buf[j] != '\0'; j++){
+        if(buf[j] == '|'){
+            PipeNum++;
+            break;
+        }
+    }
+    if(PipeNum != 1){
+        my_error("Only one pipe",__LINE__);
+    }
 
+    char outputBuf[j];
+    memset(outputBuf, 0, j);
+    char inputBuf[strlen(buf) - j];
+    memset(inputBuf, 0, strlen(buf) - j);
+    //buf[j] == '|'
+    for (i = 0; i < j - 1; i++) {
+        outputBuf[i] = buf[i];
+    }
+    for (i = 0; i < strlen(buf) - j; i++) {
+        inputBuf[i] = buf[j + 2 + i];
+    }
+
+
+    int thepipe[2],newfd;
+    pid_t pid;
+
+    if(pipe(thepipe) == -1){
+        my_error("pipe",__LINE__);
+    }
+
+    if((pid = fork()) == -1){
+        my_error("fork",__LINE__);
+    }
+
+    if(pid > 0){//父进程接收输出
+        close(thepipe[1]);
+        if((dup2(thepipe[0], 0)) == -1){
+            my_error("dup2",__LINE__);
+        }
+        close(thepipe[0]);
+        parse(inputBuf);
+        execvp(argv[0], argv);
+        pause();
+        my_error("execvp",__LINE__);
+    }else if(pid == 0){//子进程接收输入
+        close(thepipe[0]);
+        if(dup2(thepipe[1],1) == -1){
+            my_error("dup2",__LINE__);
+        }
+        close(thepipe[1]);
+        parse(outputBuf);
+        execvp(argv[0],argv);
+        my_error("execvp",__LINE__);
+    }
 }
 
 int command_with_Back(char *buf)
