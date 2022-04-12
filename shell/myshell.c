@@ -3,6 +3,7 @@
 #include<string.h>
 #include<unistd.h>
 #include<sys/wait.h>
+#include<sys/stat.h>
 #include<fcntl.h>
 #include<signal.h>
 #include<errno.h>
@@ -30,7 +31,7 @@ int command_with_OutRePlus(char *);
 int command_with_Pipe(char *);
 int command_with_Back(char *);
 
-int callCd(int );
+void callCd(int );
 int printHistory(char COMMAND[MAX_CMD][MAX_CMD_LEN]);
 
 #define CLOSE "\001\033[0m\002"                 // 关闭所有属性
@@ -43,7 +44,7 @@ int main()
     while(1){
         char place[BUFFSIZE];
         getcwd(place, BUFFSIZE);
-        printf("%s:", place);
+        printf(BEGIN(36,36)"%s:"CLOSE, place);
         char *command = readline(BEGIN(33,33)"ypd-super-shell ￥$ "CLOSE);
         if(!command){
             my_error("readline",__LINE__);
@@ -144,16 +145,14 @@ void do_cmd(int argc, char **argv)
         if(strcmp(COMMAND[j], "&") == 0){
             strcpy(buf,backupCommand);
             command_with_Back(buf);
+            return;
         }
     }
 
     pid_t pid;
     //识别shell内置命令
     if(strcmp(COMMAND[0], "cd") == 0){
-        int res = callCd(argc);
-        if(!res){
-            my_error("cd",__LINE__);
-        }
+        callCd(argc);
     }else if(strcmp(COMMAND[0], "history") == 0){
         HIST_ENTRY **history = NULL;
         history = history_list();
@@ -222,7 +221,7 @@ int command_with_OutRe(char *buf)
     }
     if(pid == 0){
         int fd;
-        fd = open(OutFile, O_RDWR | O_CREAT | O_TRUNC,7777);
+        fd = open(OutFile, O_RDWR | O_CREAT | O_TRUNC , S_IRUSR | S_IWUSR);
         if(fd < 0){
             my_error("open",__LINE__);
         }
@@ -280,7 +279,7 @@ int command_with_InRe(char *buf)
     }
     if(pid == 0){
         int fd;
-        fd = open(InFile, O_RDONLY, 7777);
+        fd = open(InFile, O_RDONLY, S_IRUSR | S_IWUSR);
         if(fd < 0){
             my_error("open",__LINE__);
         }
@@ -338,7 +337,7 @@ int command_with_OutRePlus(char *buf)
     }
     if(pid == 0){
         int fd;
-        fd = open(OutFileP,O_RDWR|O_APPEND|O_CREAT,7777);
+        fd = open(OutFileP,O_RDWR|O_APPEND|O_CREAT,S_IRUSR | S_IWUSR);
         if(fd < 0){
             my_error("open",__LINE__);
         }
@@ -377,11 +376,11 @@ int command_with_Pipe(char *buf)
     char inputBuf[strlen(buf) - j];
     memset(inputBuf, 0, strlen(buf) - j);
     //buf[j] == '|'
-    for (i = 0; i < j - 1; i++) {
+    for (i = 0; i <= j - 1; i++) {
         outputBuf[i] = buf[i];
     }
     for (i = 0; i < strlen(buf) - j; i++) {
-        inputBuf[i] = buf[j + 2 + i];
+        inputBuf[i] = buf[j + 1 + i];
     }
 
 
@@ -403,8 +402,8 @@ int command_with_Pipe(char *buf)
         }
         close(thepipe[0]);
         parse(inputBuf);
-        execvp(argv[0], argv);
-        pause();
+        my_signal();
+        execvp(argv[0],argv);
         my_error("execvp",__LINE__);
     }else if(pid == 0){//子进程接收输入
         close(thepipe[0]);
@@ -450,30 +449,44 @@ int command_with_Back(char *buf)
     }
 }
 
-char curPath[BUFFSIZE];
-int callCd(int argc)
+
+char oldPath[BUFFSIZE];
+void callCd(int argc)
 {
     int result = 1;
     if(argc == 1) {
         int ret = chdir("/home/yyn");
-        if(ret){
-            return 0;
-        }
+        return;
     }else{
-        int ret = chdir(COMMAND[1]);
+        int ret = 0;
+        int flag_gang = 0;
+        int flag_piao = 0;
+        int flag;
+        for(int i = 0; COMMAND[1][i]; i++) {
+            if(COMMAND[1][i] == '-'){
+                flag_gang = 1;
+            }
+            if(COMMAND[1][i] == '~'){
+                flag_piao = 1;
+            }
+        }
+        if(flag_gang){;
+            if((ret = chdir(oldPath)) == -1){
+                my_error("chdir",__LINE__);
+            }
+        }else if(flag_piao){
+            getcwd(oldPath, BUFFSIZE);
+            if((ret = chdir("/home/yyn")) == -1){
+                my_error("chdir",__LINE__);
+            }
+        }else{
+            getcwd(oldPath, BUFFSIZE);
+            ret = chdir(COMMAND[1]);
+        }
         if(ret){
-            return 0;
+            return;
         }
     }
-    if(result){
-        char *res = getcwd(curPath, BUFFSIZE);
-        if(res == NULL){
-            my_error("cd getcwd",__LINE__);
-        }
-        //printf("cd to: %s\n",curPath);
-        return result;
-    }
-    return 0;
 }
 
 
@@ -492,5 +505,4 @@ void my_error(char *string, int line)
     fprintf(stderr, "Line:%d,error:\n", line);
     fprintf(stderr, "%s:%s\n", string, strerror(errno));
     printf("***********************\n");
-    exit(EXIT_FAILURE);
 }
