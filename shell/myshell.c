@@ -19,6 +19,8 @@
 struct 
 {
     char *argv[BUFFSIZE];
+    char *in;
+    char *out;
 }cmd[16];
 
 int argc;
@@ -113,6 +115,14 @@ command 为用户输入的命令
 void do_cmd(int argc, char **argv)
 {
     char buf[1024];
+    ///识别管道命令
+    for(int i = 0;i < BUFFSIZE; i++){
+        if(backupCommand[i] == '|'){
+            strcpy(buf,backupCommand);
+            command_with_Pipe(buf);
+            return;
+        }
+    }
     //识别输出重定向
     for(int j = 0;j < MAX_CMD; j++){
         if(strcmp(COMMAND[j], ">") == 0){
@@ -134,14 +144,6 @@ void do_cmd(int argc, char **argv)
         if(strcmp(COMMAND[j], ">>") == 0){
             strcpy(buf,backupCommand);
             command_with_OutRePlus(buf);
-            return;
-        }
-    }
-    //识别管道命令
-    for(int i = 0;i < BUFFSIZE; i++){
-        if(backupCommand[i] == '|'){
-            strcpy(buf,backupCommand);
-            command_with_Pipe(buf);
             return;
         }
     }
@@ -362,19 +364,41 @@ int command_with_OutRePlus(char *buf)
     }
 }
 
+int flag_out = 0;
+int flag_in = 0 ;
 int parse_pipe(char *buf,int cmd_num)
 {
     int n = 0;
     char *p = buf;
+    cmd[cmd_num].in = NULL;
+    cmd[cmd_num].out = NULL;
     while(*p != '\0'){
         if(*p == ' '){
             *p++ = '\0';
+            continue;
+        }
+        if(*p == '<'){
+            *p = '\0';
+            flag_in = 1;
+            while(*(++p) == ' '){
+                ;
+            }
+            cmd[cmd_num].in = p;
+            continue;
+        }
+        if(*p == '>'){
+            *p = '\0';
+            flag_out = 1;
+            while(*(++p) == ' ');
+            cmd[cmd_num].out = p;
             continue;
         }
         if(*p != ' ' && ((p == buf) || *(p-1) == '\0')){
             if(n < MAX_CMD){
                 cmd[cmd_num].argv[n++] = p++;
                 continue;
+            }else{
+                return -1;
             }
         }
         p++;
@@ -385,6 +409,7 @@ int parse_pipe(char *buf,int cmd_num)
     cmd[cmd_num].argv[n] = NULL;
     return 0;
 }
+
 
 int command_with_Pipe(char *buf)
 {
@@ -399,6 +424,8 @@ int command_with_Pipe(char *buf)
         }
     }
     while ((curcmd = strsep(&nextcmd, "|"))){
+        flag_out = 0;
+        flag_in = 0;
         if(parse_pipe(curcmd, cmd_num++) < 0){
             cmd_num--;
             break;
@@ -421,7 +448,6 @@ int command_with_Pipe(char *buf)
 
     if(pid == 0){
         if(pipe_num != 0){
-        
             if (i == 0){ //第一个创建的子进程
             //管道的输入为标准输入
                 dup2(fd[0][1], STDOUT_FILENO);
@@ -456,23 +482,36 @@ int command_with_Pipe(char *buf)
                 }
             }
         }
-        pipe_num = 0;
+        if(flag_in){
+            int file_fd = open(cmd[i].in, O_RDONLY);
+            if(file_fd == -1){
+                my_error("open",__LINE__);
+            }
+            dup2(file_fd, STDIN_FILENO);
+        }
+        if(flag_out){
+            int file_fd = open(cmd[i].out, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            if(file_fd == -1){
+                my_error("open",__LINE__);
+            }
+            dup2(file_fd, STDOUT_FILENO);
+        }
+        //else{
+        //     if(strcmp(COMMAND[0],"exit")){
+        //         exit(0);
+        //     }
+        // }
         execvp(cmd[i].argv[0], cmd[i].argv); //执行用户输入的命令
         my_error("execvp",__LINE__);
-        exit(1);
     }else{// parent
-    //关闭父进程所有管道
-    for (i = 0; i < pipe_num; i++){
-            close(fd[i][0]);
-            close(fd[i][1]);
-        }
-        
+    //关闭父进程两侧管道
+        for (i = 0; i < pipe_num; i++){
+                close(fd[i][0]);
+                close(fd[i][1]);
+            }
+
         for (i = 0; i <= cmd_num; i++){
-            int wpid = wait(NULL);
-            // if(wpid == -1)
-            // {
-            //     my_error("wait error",__LINE__);
-            // }
+            wait(NULL);//一父收一子
         }
     }
 }
