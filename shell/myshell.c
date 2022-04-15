@@ -16,6 +16,11 @@
 #define MAX_CMD_LEN 100
 #define BUFFSIZE 100
 
+struct 
+{
+    char *argv[BUFFSIZE];
+}cmd[16];
+
 int argc;
 char *argv[MAX_CMD];
 char COMMAND[MAX_CMD][MAX_CMD_LEN];
@@ -28,9 +33,9 @@ void do_cmd(int, char **);
 int command_with_OutRe(char *);
 int command_with_InRe(char *); 
 int command_with_OutRePlus(char *);
+int parse_pipe(char *buf,int cmd_num);
 int command_with_Pipe(char *);
 int command_with_Back(char *);
-
 void callCd(int );
 int printHistory(char COMMAND[MAX_CMD][MAX_CMD_LEN]);
 
@@ -40,7 +45,7 @@ int printHistory(char COMMAND[MAX_CMD][MAX_CMD_LEN]);
 
 int main()
 {
-    my_signal();
+    //my_signal();
     while(1){
         char place[BUFFSIZE];
         getcwd(place, BUFFSIZE);
@@ -133,8 +138,8 @@ void do_cmd(int argc, char **argv)
         }
     }
     //识别管道命令
-    for(int j = 0;j < MAX_CMD; j++){
-        if(strcmp(COMMAND[j], "|") == 0){
+    for(int i = 0;i < BUFFSIZE; i++){
+        if(backupCommand[i] == '|'){
             strcpy(buf,backupCommand);
             command_with_Pipe(buf);
             return;
@@ -357,63 +362,118 @@ int command_with_OutRePlus(char *buf)
     }
 }
 
+int parse_pipe(char *buf,int cmd_num)
+{
+    int n = 0;
+    char *p = buf;
+    while(*p != '\0'){
+        if(*p == ' '){
+            *p++ = '\0';
+            continue;
+        }
+        if(*p != ' ' && ((p == buf) || *(p-1) == '\0')){
+            if(n < MAX_CMD){
+                cmd[cmd_num].argv[n++] = p++;
+                continue;
+            }
+        }
+        p++;
+    }
+    if(n == 0){
+        return -1;
+    }
+    cmd[cmd_num].argv[n] = NULL;
+    return 0;
+}
+
 int command_with_Pipe(char *buf)
 {
-    int PipeNum = 0;
-    int i,j;
-    for(j = 0; buf[j] != '\0'; j++){
-        if(buf[j] == '|'){
-            PipeNum++;
+    int i, j;
+    int cmd_num = 0, pipe_num = 0;
+    int fd[16][2];
+    char *curcmd;
+    char *nextcmd = buf;
+    for (int k = 0; buf[k]; k++){
+        if(buf[k] == '|'){
+            pipe_num++;
+        }
+    }
+    while ((curcmd = strsep(&nextcmd, "|"))){
+        if(parse_pipe(curcmd, cmd_num++) < 0){
+            cmd_num--;
             break;
         }
-    }
-    if(PipeNum != 1){
-        my_error("Only one pipe",__LINE__);
-    }
-
-    char outputBuf[j];
-    memset(outputBuf, 0, j);
-    char inputBuf[strlen(buf) - j];
-    memset(inputBuf, 0, strlen(buf) - j);
-    //buf[j] == '|'
-    for (i = 0; i <= j - 1; i++) {
-        outputBuf[i] = buf[i];
-    }
-    for (i = 0; i < strlen(buf) - j; i++) {
-        inputBuf[i] = buf[j + 1 + i];
+        if(cmd_num == 17)//16根管道最多支持17条命令
+            break;
     }
 
+    for (i = 0; i < pipe_num; i++){//创建管道
+        if(pipe(fd[i])){
+            my_error("pipe", __LINE__);
+        }
+    }
 
-    int thepipe[2],newfd;
     pid_t pid;
-
-    if(pipe(thepipe) == -1){
-        my_error("pipe",__LINE__);
+    for (i = 0; i <= pipe_num; i++){ //管道数目决定创建子进程个数
+        if((pid = fork()) == 0)
+            break;
     }
 
-    if((pid = fork()) == -1){
-        my_error("fork",__LINE__);
-    }
+    if(pid == 0){
+        if(pipe_num != 0){
+        
+            if (i == 0){ //第一个创建的子进程
+            //管道的输入为标准输入
+                dup2(fd[0][1], STDOUT_FILENO);
+                close(fd[0][0]);
 
-    if(pid > 0){//父进程接收输出
-        close(thepipe[1]);
-        if((dup2(thepipe[0], 0)) == -1){
-            my_error("dup2",__LINE__);
+                for (j = 1; j < pipe_num; j++){
+                    close(fd[j][0]);
+                    close(fd[j][1]);
+                }
+            }else if (i == pipe_num){ //最后一个创建的子进程
+            //管道的输出为标准输出
+                dup2(fd[i-1][0], STDIN_FILENO);
+                close(fd[i-1][1]);
+
+                for (j = 0; j < pipe_num - 1; j++){
+                    close(fd[j][0]);
+                    close(fd[j][1]);
+                }
+            }else{
+                //重定中间进程的标准输入至管道读端
+                dup2(fd[i-1][0], STDIN_FILENO); 
+                close(fd[i-1][1]);
+                //重定中间进程的标准输出至管道写端
+                dup2(fd[i][1], STDOUT_FILENO);
+                close(fd[i][0]);
+
+                for (j = 0; j < pipe_num; j++){ //关闭不使用的管道读写两端
+                    if (j != i || j != i - 1){
+                        close(fd[j][0]);
+                        close(fd[j][1]);
+                    }
+                }
+            }
         }
-        close(thepipe[0]);
-        parse(inputBuf);
-        my_signal();
-        execvp(argv[0],argv);
+        pipe_num = 0;
+        execvp(cmd[i].argv[0], cmd[i].argv); //执行用户输入的命令
         my_error("execvp",__LINE__);
-    }else if(pid == 0){//子进程接收输入
-        close(thepipe[0]);
-        if(dup2(thepipe[1],1) == -1){
-            my_error("dup2",__LINE__);
+        exit(1);
+    }else{// parent
+    //关闭父进程所有管道
+    for (i = 0; i < pipe_num; i++){
+            close(fd[i][0]);
+            close(fd[i][1]);
         }
-        close(thepipe[1]);
-        parse(outputBuf);
-        execvp(argv[0],argv);
-        my_error("execvp",__LINE__);
+        
+        for (i = 0; i <= cmd_num; i++){
+            int wpid = wait(NULL);
+            // if(wpid == -1)
+            // {
+            //     my_error("wait error",__LINE__);
+            // }
+        }
     }
 }
 
@@ -425,7 +485,6 @@ int command_with_Back(char *buf)
     for(int i = 0; i < strlen(buf); i++){
         BackBuf[i] = buf[i];
         if(buf[i] == '&'){
-            BackBuf[i] = '\0';
             BackBuf[i-1] = '\0';
             break;
         }
@@ -470,10 +529,11 @@ void callCd(int argc)
                 flag_piao = 1;
             }
         }
-        if(flag_gang){;
+        if(flag_gang){
             if((ret = chdir(oldPath)) == -1){
                 my_error("chdir",__LINE__);
             }
+            getcwd(oldPath, BUFFSIZE);
         }else if(flag_piao){
             getcwd(oldPath, BUFFSIZE);
             if((ret = chdir("/home/yyn")) == -1){
@@ -501,7 +561,6 @@ void my_signal()
 
 void my_error(char *string, int line)
 {//myerror("malloc", __LINE__);
-    printf("***********************\n");
     fprintf(stderr, "Line:%d,error:\n", line);
     fprintf(stderr, "%s:%s\n", string, strerror(errno));
     printf("***********************\n");
