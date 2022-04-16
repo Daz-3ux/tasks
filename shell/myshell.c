@@ -487,7 +487,6 @@ int command_with_Pipe(char *buf)
         }
         if(flag_out){
             int file_fd = open(cmd[i].out, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-
             dup2(file_fd, STDOUT_FILENO);
         }
         // else{
