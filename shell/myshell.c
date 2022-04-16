@@ -401,12 +401,11 @@ int parse_pipe(char *buf,int cmd_num)
                 return -1;
             }
         }
-        p++;
+        ++p;
     }
     if(n == 0){
         return -1;
     }
-    cmd[cmd_num].argv[n] = NULL;
     return 0;
 }
 
@@ -475,7 +474,7 @@ int command_with_Pipe(char *buf)
                 close(fd[i][0]);
 
                 for (j = 0; j < pipe_num; j++){ //关闭不使用的管道读写两端
-                    if (j != i || j != i - 1){
+                    if (j != i || j != (i - 1)){
                         close(fd[j][0]);
                         close(fd[j][1]);
                     }
@@ -484,21 +483,16 @@ int command_with_Pipe(char *buf)
         }
         if(flag_in){
             int file_fd = open(cmd[i].in, O_RDONLY);
-            if(file_fd == -1){
-                my_error("open",__LINE__);
-            }
             dup2(file_fd, STDIN_FILENO);
         }
         if(flag_out){
             int file_fd = open(cmd[i].out, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-            if(file_fd == -1){
-                my_error("open",__LINE__);
-            }
+
             dup2(file_fd, STDOUT_FILENO);
         }
-        //else{
+        // else{
         //     if(strcmp(COMMAND[0],"exit")){
-        //         exit(0);
+        //         return 0;
         //     }
         // }
         execvp(cmd[i].argv[0], cmd[i].argv); //执行用户输入的命令
@@ -510,7 +504,7 @@ int command_with_Pipe(char *buf)
                 close(fd[i][1]);
             }
 
-        for (i = 0; i <= cmd_num; i++){
+        for (i = 0; i < cmd_num; i++){
             wait(NULL);//一父收一子
         }
     }
