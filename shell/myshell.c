@@ -546,7 +546,7 @@ void callCd(int argc)
 {
     int result = 1;
     if(argc == 1) {
-        int ret = chdir("/home/yyn");
+        int ret = chdir("/home");
         return;
     }else{
         int ret = 0;
