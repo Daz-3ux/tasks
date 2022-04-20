@@ -47,7 +47,7 @@ int printHistory(char COMMAND[MAX_CMD][MAX_CMD_LEN]);
 
 int main()
 {
-    my_signal();
+    //my_signal();
     while(1){
         char place[BUFFSIZE];
         getcwd(place, BUFFSIZE);
@@ -78,7 +78,7 @@ command 为用户输入的命令
         }
     }
     argc = 0;//命令数计数器
-    memset(backupCommand,0,sizeof(backupCommand));
+    
     strcpy(backupCommand, command);//备份命令
     
     int j = 0;
@@ -409,6 +409,7 @@ int parse_pipe(char *buf,int cmd_num)
     return 0;
 }
 
+
 int command_with_Pipe(char *buf)
 {
     int i, j;
@@ -430,7 +431,7 @@ int command_with_Pipe(char *buf)
         }
         if(cmd_num == 17)//16根管道最多支持17条命令
             break;
-    }   
+    }
 
     for (i = 0; i < pipe_num; i++){//创建管道
         if(pipe(fd[i])){
@@ -501,8 +502,9 @@ int command_with_Pipe(char *buf)
                 close(fd[i][0]);
                 close(fd[i][1]);
             }
-        for(int i = 0; i < cmd_num; i++){
-            wait(NULL);
+
+        for (i = 0; i < cmd_num; i++){
+            wait(NULL);//一父收一子
         }
     }
 }
@@ -538,8 +540,10 @@ int command_with_Back(char *buf)
     }
 }
 
-char oldPath[BUFFSIZE]; 
-void callCd(int argc){
+
+char oldPath[BUFFSIZE];
+void callCd(int argc)
+{
     int result = 1;
     if(argc == 1) {
         int ret = chdir("/home");
