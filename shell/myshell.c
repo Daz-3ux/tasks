@@ -32,14 +32,14 @@ void my_signal();
 void my_error();
 void parse(char *);
 void do_cmd(int, char **);
-int command_with_OutRe(char *);
-int command_with_InRe(char *); 
-int command_with_OutRePlus(char *);
+void command_with_OutRe(char *);
+void command_with_InRe(char *); 
+void command_with_OutRePlus(char *);
 int parse_pipe(char *buf,int cmd_num);
-int command_with_Pipe(char *);
-int command_with_Back(char *);
+void command_with_Pipe(char *);
+void command_with_Back(char *);
 void callCd(int );
-int printHistory(char COMMAND[MAX_CMD][MAX_CMD_LEN]);
+
 
 #define CLOSE "\001\033[0m\002"                 // 关闭所有属性
 #define BEGIN(x,y) "\001\033["#x";"#y"m\002"    // x: 背景，y: 前景
@@ -189,7 +189,7 @@ void do_cmd(int argc, char **argv)
 }
 
 //buf实际为用户输入的command
-int command_with_OutRe(char *buf)
+void command_with_OutRe(char *buf)
 {//command > file
     char OutFile[1024];
     memset(OutFile, 0, BUFFSIZE);
@@ -248,7 +248,7 @@ int command_with_OutRe(char *buf)
     }
 }
 
-int command_with_InRe(char *buf)
+void command_with_InRe(char *buf)
 {//command < file
     char InFile[1024];
     memset(InFile, 0, BUFFSIZE);
@@ -306,7 +306,7 @@ int command_with_InRe(char *buf)
     }
 }
 
-int command_with_OutRePlus(char *buf)
+void command_with_OutRePlus(char *buf)
 {
     char OutFileP[1024];
     memset(OutFileP, 0, BUFFSIZE);
@@ -409,7 +409,7 @@ int parse_pipe(char *buf,int cmd_num)
     return 0;
 }
 
-int command_with_Pipe(char *buf)
+void command_with_Pipe(char *buf)
 {
     int i, j;
     int cmd_num = 0, pipe_num = 0;
@@ -507,7 +507,7 @@ int command_with_Pipe(char *buf)
     }
 }
 
-int command_with_Back(char *buf)
+void command_with_Back(char *buf)
 {
     char BackBuf[strlen(buf)];
     memset(BackBuf, 0, strlen(buf));
