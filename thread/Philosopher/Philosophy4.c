@@ -35,6 +35,7 @@ void *PHILO(void *arg)
         //哲学家按序号顺时针就坐，筷子按序号顺时针摆放(筷子0在哲学家0的右手边)
         int i = *(int*)arg;
         int left,right;
+<<<<<<< HEAD
         if(i < 4){
             right = i;
             left = i + 1;
@@ -43,6 +44,10 @@ void *PHILO(void *arg)
             left = 4;
             right = 0;
         }
+=======
+        right = i;
+        left = i + 1;
+>>>>>>> 58778b3af9175ec426f1005dc82288973c09f6b1
 
         pthread_mutex_lock(&mutex[right]);//先给右手加锁
         if(pthread_mutex_trylock(&mutex[left]) == 0){//再尝试给左手加锁
