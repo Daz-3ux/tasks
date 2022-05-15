@@ -37,22 +37,24 @@ void *PHILO(void *arg)
         int left,right;
         if(i < 4){
             right = i;
-            left = right + 1;
-        }else{
+            left = i + 1;
+        }
+        if(i == 4){
+            left = 4;
             right = 0;
-            left = i;
         }
 
         pthread_mutex_lock(&mutex[right]);//先给右手加锁
         if(pthread_mutex_trylock(&mutex[left]) == 0){//再尝试给左手加锁
-            printf("哲学家 %d 正在就餐\n", i);//左右锁齐全，开始就餐
+            //左右锁齐全，开始就餐
+            printf("哲学家 %d 正在就餐\n", i);
             pthread_mutex_unlock(&mutex[left]);
         }
 
         pthread_mutex_unlock(&mutex[right]);
         
 
-        sleep( rand() % 3);
+        //sleep( rand() % 3);
     }
     return NULL;
 }
