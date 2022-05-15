@@ -8,6 +8,8 @@
 
 #define N 5
 
+int i0, i1, i2, i3, i4;
+
 int philosopher[N] = {0, 1, 2, 3, 4};//五个哲学家的编号
 pthread_mutex_t mutex[N];
 
@@ -35,24 +37,33 @@ void *PHILO(void *arg)
         //哲学家按序号顺时针就坐，筷子按序号顺时针摆放(筷子0在哲学家0的右手边)
         int i = *(int*)arg;
         int left,right;
-<<<<<<< HEAD
+
         if(i < 4){
             right = i;
             left = i + 1;
+            if(i == 2){
+                right = 3;
+                left = 2;
+            }
         }
         if(i == 4){
             left = 4;
             right = 0;
         }
-=======
-        right = i;
-        left = i + 1;
->>>>>>> 58778b3af9175ec426f1005dc82288973c09f6b1
 
         pthread_mutex_lock(&mutex[right]);//先给右手加锁
         if(pthread_mutex_trylock(&mutex[left]) == 0){//再尝试给左手加锁
             //左右锁齐全，开始就餐
             printf("哲学家 %d 正在就餐\n", i);
+            switch (i){
+                case 0: i0++; break;
+                case 1: i1++; break;
+                case 2: i2++; break;
+                case 3: i3++; break;
+                case 4: i4++; break;
+                default: break;
+            }
+            printf("哲学家分别就餐次数: %d %d %d %d %d\n", i0, i1, i2, i3, i4);
             pthread_mutex_unlock(&mutex[left]);
         }
 
