@@ -70,7 +70,7 @@ do{
     }
 
     //任务队列
-    pool->taskQ = (Task*)malloc(sizeof(Task));
+    pool->taskQ = (Task*)malloc(sizeof(Task)*queueSize);
     if(pool->taskQ == NULL){
         my_error("malloc error",__LINE__);
     }
@@ -108,7 +108,6 @@ void *worker(void* arg)
         while(pool->queueSize == 0 && !pool->shutdown){
             pthread_cond_wait(&pool->Empty, &pool->mutexPool);
             if(pool->exitNum_Threads > 0){
-                //pthread_mutex_lock(&pool->mutexPool);
                 pool->exitNum_Threads--;
                 if(pool->liveNum_Threads > pool->minNum_Threads){
                     pool->liveNum_Threads--;
@@ -246,9 +245,11 @@ void threadPoolAdd(ThreadPool * pool, void(*func)(void*), void*arg)
     pthread_mutex_lock(&pool->mutexPool);
     while(pool->queueSize == pool->queueCapacity &&
     pool->shutdown == 0){
+        //队列满,阻塞生产者线程
         pthread_cond_wait(&pool->Full, &pool->mutexPool);
     }
     if(pool->shutdown == 1){
+        //若需要销毁线程池
         pthread_mutex_unlock(&pool->mutexPool);
         return;
     }
