@@ -44,10 +44,12 @@ void SPSCQueuePush(SPSCQueue *queue, void *s)
     // 还有剩余空间
     if(queue->size < queue->capacity){
         queue->my_queue[queue->size++] = s;
-        pthread_mutex_unlock(&queue->mutex);
+        
     }else{
         pthread_cond_signal(&queue->cond);
+        //再加一个生产者自己怎么办
     }
+    pthread_mutex_unlock(&queue->mutex);
 }
 
 void *SPSCQueuePop(SPSCQueue *queue){
@@ -56,9 +58,11 @@ void *SPSCQueuePop(SPSCQueue *queue){
         //队列空
         pthread_cond_wait(&queue->cond, &queue->mutex);
     }
-    queue->my_queue[--queue->size] = 0;
+    void *ret = queue->my_queue[--queue->size];
+    queue->my_queue[queue->size] = NULL;
     //queue->size--;
     pthread_mutex_unlock(&queue->mutex);
     
-    return queue;
+    //return "pop";
+    return ret;
 }
