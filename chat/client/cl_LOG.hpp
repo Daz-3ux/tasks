@@ -7,7 +7,6 @@
 #include <string.h>
 #include <iostream>
 #include <nlohmann/json.hpp>
-#include "cl_LOG.hpp"
 
 using json = nlohmann::json;
 
