@@ -43,8 +43,11 @@ void loopAction(MsgData &msg, int sockfd)
 
 int main(int argc, char* argv[])
 {
-  if(argc != 2) {
+  if(argc != 3) {
     std::cout << "Usage: " << basename(argv[0]) << " ip_address port_number" << std::endl;
+    std::cout << "程序即将退出, 下次请正确输入" <<std::endl;
+    sleep(0.5);
+    exit(EXIT_FAILURE);
   }else{
     strncpy(IP, argv[1], sizeof(IP));
     PORT = atoi(argv[2]);
