@@ -1,9 +1,17 @@
 #ifndef CL_LOG_H
 #define CL_LOG_H
 #include "cl_UI.hpp"
-#include "cl_JSON.hpp"
+#include <vector>
+#include <map>
+#include <string>
+#include <string.h>
+#include <iostream>
+#include <nlohmann/json.hpp>
+#include "cl_LOG.hpp"
 
-enum {
+using json = nlohmann::json;
+
+enum Status{
   _Register = 1
 };
 
@@ -39,27 +47,30 @@ void mygets(char *str, int num)
   }
 }
 
+std::string registerJson(MsgData &msg, int sockfd)
+{
+  json root;
+  root["name"] = msg.name;
+  root["passwd"] = msg.passwd;
+  root["online"] = msg.online;
+  root["root"] = msg.root;
+  root["loginStatus"] = msg.loginStatus;
+  root["question"] = msg.question;
+  root["answer"] = msg.answer;
+
+  std::string s = root.dump();
+  return s;
+}
+
 void registerNewAccount(MsgData &msg,int sockfd)
 {
   std::cout << "Register youself" << std::endl;
   std::cout << "Please input a name" << std::endl;
   std::cin >> msg.name;
   std::cout << "Please input a passwd" << std::endl;
-  char ch;
-  int i = 0;
-  while (true)
-	{
-		system("stty -echo");
-    ch = getchar();
-    system("stty echo");
-		msg.passwd[i++] = ch;
-		if (ch=='\r')//getch()函数如果读到回车符号返回'/r'
-		{
-			msg.passwd[i] = '\0';
-			break;
-		}
-		putchar('*');
-	}
+	system("stty -echo");
+  std::cin >> msg.passwd;
+  system("stty echo");
   msg.loginStatus = _Register;
   msg.online = false;
   msg.root = false;
@@ -70,9 +81,6 @@ void registerNewAccount(MsgData &msg,int sockfd)
 
   // 发送新用户到服务器
   send(sockfd, newone.c_str(), newone.size(), 0);
-
-
-
 }
 
 #endif

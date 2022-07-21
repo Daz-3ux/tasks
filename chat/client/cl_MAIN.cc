@@ -1,25 +1,23 @@
 #include "cl_SOCK.hpp"
 #include "cl_UI.hpp"
 #include "cl_LOG.hpp"
-#include <cstdlib>
-#include <cstring>
+
 
 void loopAction(MsgData &msg, int sockfd)
 {
   // 增加程序健壮性
-  std::string action;
   while(1)
   {
+    std::string action;
+    system("clear");
     firstMenu();
     std::cout << "请选择操作" << std::endl;
     std::cin >> action;
     int opt = atoi(action.c_str());
     switch(opt)
     {
-      case 1 : // 注册
-        MsgData msg;
-        //registerNewAccount(msg, sockfd);
-        printf("all right\n");
+      case 1: // 注册
+        registerNewAccount(msg, sockfd);
         break;
       case 2: // 登陆
         //loginAccount();
