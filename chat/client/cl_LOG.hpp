@@ -27,24 +27,6 @@ struct MsgData
   MsgData() : online(false), root(false) {}
 };
 
-void mygets(char *str, int num)
-{
-  char *ret;
-  int i = 0;
-  ret = fgets(str, num, stdin);
-  if(ret) {
-    while(str[i] != '\n' && str[i] != '\0') {
-      i++;
-    }
-    if(str[i] == '\n') {
-      str[i] = '\0';
-    }else { // 丢弃过长字符
-      while(getchar() != '\n') {
-        continue;
-      }
-    }
-  }
-}
 
 std::string registerJson(MsgData &msg, int sockfd)
 {
@@ -63,23 +45,33 @@ std::string registerJson(MsgData &msg, int sockfd)
 
 void registerNewAccount(MsgData &msg,int sockfd)
 {
-  std::cout << "Register youself" << std::endl;
+  std::cout << "Register youself!" << std::endl;
+
   std::cout << "Please input a name" << std::endl;
   std::cin >> msg.name;
   std::cout << "Please input a passwd" << std::endl;
 	system("stty -echo");
   std::cin >> msg.passwd;
   system("stty echo");
+
+  std::cout << "Please input a secur-question" << std::endl;
+  std::cin >> msg.question;
+  std::cout << "Please input a secur-answer" << std::endl;
+  std::cin >> msg.answer;
+
   msg.loginStatus = _Register;
   msg.online = false;
   msg.root = false;
 
+
   std::string newone = registerJson(msg, sockfd);
-
-  system("clear");
-
   // 发送新用户到服务器
   send(sockfd, newone.c_str(), newone.size(), 0);
+}
+
+void loginAccount()
+{
+  UserMenu();
 }
 
 #endif

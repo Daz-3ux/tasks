@@ -9,6 +9,11 @@ typedef struct socketinfo {
   int epfd;
 } socketInfo;
 
+class User
+{
+
+};
+
 class Epoll
 {
 public:

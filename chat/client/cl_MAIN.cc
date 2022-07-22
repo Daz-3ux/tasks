@@ -6,22 +6,25 @@
 void loopAction(MsgData &msg, int sockfd)
 {
   // 增加程序健壮性
+  firstMenu();
   while(1)
   {
     std::string action;
-    system("clear");
-    firstMenu();
     std::cout << "请选择操作" << std::endl;
     std::cin >> action;
     int opt = atoi(action.c_str());
     switch(opt)
     {
       case 1: // 注册
-        registerNewAccount(msg, sockfd);
+      {
+        registerNewAccou0nt(msg, sockfd);
         break;
+      }
       case 2: // 登陆
-        //loginAccount();
+      {
+        loginAccount();
         break;
+      }
       case 3: // 修改密码
         //updataPassword();
         break;
