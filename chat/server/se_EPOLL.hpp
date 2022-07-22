@@ -9,6 +9,20 @@ typedef struct socketinfo {
   int epfd;
 } socketInfo;
 
+class Epoll
+{
+public:
+  static int Create()
+  {
+    int epfd = epoll_create(6);
+    if(epfd < 0) {
+      my_error("epoll_create", __FILE__, __LINE__);
+    }
+
+    return epfd;
+  }
+};
+
 void *acceptConn(void *arg) {
   printf("accept connection: %ld", pthread_self());
   socketInfo *info = (socketInfo *)arg;
@@ -23,7 +37,7 @@ void *acceptConn(void *arg) {
   ev.data.fd = cfd;
   int ret = epoll_ctl(info->epfd, EPOLL_CTL_ADD, cfd, &ev);
   if (ret == -1) {
-    perror("ctl error");
+    my_error("ctl error", __FILE__,__LINE__);
     exit(1);
   }
 
@@ -36,18 +50,13 @@ void *communication(void *arg) {
   socketInfo *info = (socketInfo *)arg;
   int fd = info->fd;
   int epfd = info->epfd;
-  char buf[5];
-  char temp[4096];
-  bzero(temp, sizeof(temp));
+  char buf[4096];
+  memset(buf, 0, sizeof(buf));
   while (1) {
     int len = recv(fd, buf, sizeof(buf), 0);
     if (len == -1) {
       if (errno == EAGAIN) {
         printf("数据接受完毕\n");
-        int ret = send(fd, temp, strlen(temp)+1, 0);
-        if(ret == -1) {
-          perror("send error");
-        }
         break;
       }
       perror("recv error");
@@ -58,12 +67,7 @@ void *communication(void *arg) {
       epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
       break;
     }
-    printf("origin buf: %s\n", buf);
-    for (int i = 0; i < len; i++) {
-      buf[i] = toupper(buf[i]);
-    }
-    strncat(temp+strlen(temp), buf, len);
-    write(STDOUT_FILENO, temp, len);
+    write(STDOUT_FILENO, buf, len);
   }
 
   free(info);

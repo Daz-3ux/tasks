@@ -25,11 +25,7 @@ int main(int argc, char **argv)
 
   se_baseUi();
 
-  int epfd = epoll_create(1);
-  if (epfd == -1) {
-    perror("create epoll");
-    exit(1);
-  }
+  int epfd = Epoll::Create();
   
   struct epoll_event ev;
   ev.events = EPOLLIN;

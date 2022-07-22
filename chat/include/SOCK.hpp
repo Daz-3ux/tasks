@@ -1,3 +1,6 @@
+#ifndef _SOCK_H
+#define _SOCK_H
+
 #include <arpa/inet.h>
 #include <errno.h>
 #include <netinet/in.h>
@@ -20,7 +23,7 @@ public:
   {
     int socketfd = socket(AF_INET, SOCK_STREAM, 0);
     if(socketfd < 0) {
-      my_error(std::string("socket"), __LINE__);
+      my_error(std::string("socket"), __FILE__, __LINE__);
     }
     return socketfd;
   }
@@ -31,24 +34,24 @@ public:
     memset(&this_addr, 0, sizeof(this_addr));
     this_addr.sin_family = AF_INET;
     this_addr.sin_port = htons(port);
-    inet_pton(AF_INET, ip, &this_addr);
+    inet_pton(AF_INET, ip, &this_addr.sin_addr);
 
     if(bind(sockfd, (struct sockaddr*)&this_addr, sizeof(this_addr)) < 0) {
-      my_error(std::string("bind"), __LINE__);
+      my_error(std::string("bind"), __FILE__, __LINE__);
     }    
   }
 
   static void Listen(int sockfd, int limits) 
   {
     if(listen(sockfd, limits) < 0) {
-      my_error(std::string("listen"), __LINE__);
+      my_error(std::string("listen"), __FILE__, __LINE__);
     }
   }
 
   static void Accept(int sockfd) 
   {
     if(accept(sockfd, NULL, NULL) < 0) {
-      my_error(std::string("accept"), __LINE__);
+      my_error(std::string("accept"), __FILE__, __LINE__);
     }
   }
 
@@ -57,11 +60,11 @@ public:
     struct sockaddr_in this_addr;
     memset(&this_addr, 0 ,sizeof(this_addr));
     this_addr.sin_family = AF_INET;
-    this_addr.sin_port = port;
-    inet_pton(AF_INET, ip, &this_addr);
+    this_addr.sin_port = htons(port);
+    inet_pton(AF_INET, ip, &this_addr.sin_addr);
     
     if(connect(sockfd, (struct sockaddr*)&this_addr, sizeof(this_addr)) < 0) {
-      my_error(std::string("connect"), __LINE__);
+      my_error(std::string("connect"), __FILE__, __LINE__);
     }
 
   }
@@ -72,3 +75,4 @@ public:
   }
 };
 
+#endif
