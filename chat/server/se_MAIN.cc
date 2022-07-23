@@ -1,6 +1,7 @@
 #include "../include/SOCK.hpp"
 #include "se_UI.hpp"
 #include "se_EPOLL.hpp"
+#include "se_REDIS.hpp"
 
 #define MAX_CLIENT_NUM 32
 
