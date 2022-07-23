@@ -41,7 +41,7 @@ void *acceptConn(void *arg) {
 
   // 将客户连接加入至epoll
   struct epoll_event ev;
-  ev.events = EPOLLIN | EPOLLET || EPOLLRDHUP || EPOLLERR;
+  ev.events = EPOLLIN | EPOLLET | EPOLLRDHUP | EPOLLERR;
   ev.data.fd = cfd;
   int ret = epoll_ctl(info->epfd, EPOLL_CTL_ADD, cfd, &ev);
   if (ret == -1) {
@@ -64,15 +64,30 @@ void *communication(void *arg) {
 
   std::string s(buf,strlen(buf));
 
-  std::cout << buf << std::endl;
-  std::cout << s << std::endl;
+  // std::cout << buf << std::endl;
+  std::cout << s.size() << std::endl;
+  // //std::cout << s << std::endl;
 
   json js = json::parse(s);
+
   int status = js["loginStatus"];
 
-  if(status == 1) {
+  if(status == 1) { // 注册
     std::cout << "让我们来注册吧" << std::endl;
-    std::cin.get();
+  }else if(status == 2) { // 登陆
+    std::cout << "让我们来登陆吧" << std::endl;
+  }else if(status == 3) { // 修改密码
+    std::cout << "让我们来修改密码吧" << std::endl;
+
+  }else if(status == 4) { // 修改昵称
+    std::cout << "让我们来修改昵称吧" << std::endl;
+
+  }else if(status == 5) { // 找回密码
+    std::cout << "让我们来找回密码吧" << std::endl;
+
+  }else if(status == 6) { // 退出登陆
+    std::cout << "让我们来退出登陆吧" << std::endl;
+
   }
 
 

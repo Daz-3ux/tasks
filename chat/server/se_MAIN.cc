@@ -41,7 +41,6 @@ int main(int argc, char **argv)
 
   while (1) {
     int num = epoll_wait(epfd, evs, size, -1);
-    printf("%d\n", num);
     pthread_t tid;
     for (int i = 0; i < num; i++) {
       int fd = evs[i].data.fd;

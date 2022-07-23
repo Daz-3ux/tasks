@@ -11,7 +11,7 @@
 using json = nlohmann::json;
 
 enum Status{
-  _Register = 1, _ONLINE
+  _Register = 1, _LOGIN, _NEWPSWD, _NEWNAME, FINDPSWD, _OFF
 };
 
 struct MsgData 
@@ -65,7 +65,8 @@ void registerNewAccount(MsgData &msg,int sockfd)
 
 
   std::string newone = registerJson(msg, sockfd);
-  std::cout << newone.c_str() << std::endl;
+  std::cout << newone.size() << std::endl;
+  // std::cout << newone.c_str() << std::endl;
   // 发送新用户到服务器
   send(sockfd, newone.c_str(), newone.size(), 0);
 }
@@ -73,6 +74,52 @@ void registerNewAccount(MsgData &msg,int sockfd)
 void loginAccount()
 {
   UserMenu();
+  while(1)
+  {
+    std::string action;
+    std::cout << "请选择操作" << std::endl;
+    std::cin >> action;
+    int opt = atoi(action.c_str());
+    switch(opt)
+    {
+      case 1: // 添加好友
+      {
+        break;
+      }
+      case 2: // 删除好友
+      {
+        
+        break;
+      }
+      case 3: // 查看好友列表
+
+        break;
+      case 4: // 查看好友请求
+        //updataAccount();
+        break;
+      case 5: // 加入群
+        //findPassword();
+        break;
+      case 6: //
+
+        break;
+      case 7: //
+
+        break;
+      case 8: //
+
+        break;
+      case 0: // 退出
+      {
+        //loginOff();
+        std::cout << "即将退出账号!" << std::endl;
+      }
+      default:
+      {
+        std::cout << "请重新输入" << std::endl;
+      }
+    }
+  }
 }
 
 #endif
