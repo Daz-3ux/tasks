@@ -3,19 +3,23 @@
 
 #include <unistd.h>
 #include <sys/socket.h>
+#include <string>
 #include "../include/error.h"
 
 int my_recv(int fd, char *buf, int len)
 {
   char *temp = buf;
   while (len > 0){
-    ssize_t ret = recv(fd, p, len, 0);
+    ssize_t ret = recv(fd, temp, len, 0);
     if(ret < 0) {
+      if(errno == EAGAIN) {
+        break;
+      }
       my_error("recv", __FILE__, __LINE__);
     }else if(ret == 0) {
       my_error("接受的数据包大小为零", __FILE__, __LINE__);
     }else {
-      p += ret;
+      temp += ret;
       len -= ret;
     }
   }

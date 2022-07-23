@@ -17,7 +17,7 @@ void loopAction(MsgData &msg, int sockfd)
     {
       case 1: // 注册
       {
-        registerNewAccou0nt(msg, sockfd);
+        registerNewAccount(msg, sockfd);
         break;
       }
       case 2: // 登陆

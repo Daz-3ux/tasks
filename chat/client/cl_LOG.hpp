@@ -11,7 +11,7 @@
 using json = nlohmann::json;
 
 enum Status{
-  _Register = 1
+  _Register = 1, _ONLINE
 };
 
 struct MsgData 
@@ -65,6 +65,7 @@ void registerNewAccount(MsgData &msg,int sockfd)
 
 
   std::string newone = registerJson(msg, sockfd);
+  std::cout << newone.c_str() << std::endl;
   // 发送新用户到服务器
   send(sockfd, newone.c_str(), newone.size(), 0);
 }
