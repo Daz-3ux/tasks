@@ -28,7 +28,7 @@ int main(int argc, char **argv)
   int epfd = Epoll::Create();
   
   struct epoll_event ev;
-  ev.events = EPOLLIN;
+  ev.events = EPOLLIN || EPOLLET;
   ev.data.fd = lfd;
   int ret = epoll_ctl(epfd, EPOLL_CTL_ADD, lfd, &ev);
   if (ret == -1) {
@@ -51,7 +51,7 @@ int main(int argc, char **argv)
       if (fd == lfd) { // 监听套接字
         pthread_create(&tid, NULL, acceptConn, info);
         pthread_detach(tid);
-      } else { // 通信
+      } else if(evs[i].events & EPOLLIN) { // 通信
         pthread_create(&tid, NULL, communication, info);
         pthread_detach(tid);
       }

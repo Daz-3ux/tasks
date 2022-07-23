@@ -84,6 +84,7 @@ void loginAccount()
     {
       case 1: // 添加好友
       {
+        std::cout << "1" << std::endl;
         break;
       }
       case 2: // 删除好友

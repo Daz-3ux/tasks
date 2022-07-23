@@ -17,7 +17,12 @@ int my_recv(int fd, char *buf, int len)
       }
       my_error("recv", __FILE__, __LINE__);
     }else if(ret == 0) {
-      my_error("接受的数据包大小为零", __FILE__, __LINE__);
+      if(errno == 0) {
+        std::cout << "走了一个人" << std::endl;
+        break;
+      }else{
+        my_error("接受的数据包大小为零", __FILE__, __LINE__);
+      }
     }else {
       temp += ret;
       len -= ret;
